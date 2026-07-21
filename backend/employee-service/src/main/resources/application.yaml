@@ -2,13 +2,20 @@ spring:
   application:
     name: employee-service
 
+  mongodb:
+    uri: ${MONGODB_URI}
+
+  data:
+    mongodb:
+      auto-index-creation: true
+
 server:
   port: 8082
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
 
       instance:
         prefer-ip-address: true
