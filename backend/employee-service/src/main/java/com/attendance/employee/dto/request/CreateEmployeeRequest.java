@@ -31,12 +31,10 @@ public record CreateEmployeeRequest (
         )
         String phone,
 
-        @NotBlank(message = "Department is Required")
-        @Size(max = 100, message = "Department Cannot exceed 100 character")
-        String department,
+        @NotBlank(message = "DepartmentID is Required")
+        String departmentId,
 
-        @NotBlank(message = "Designation is Required")
-        @Size(max = 100, message = "Designation Cannot exceed 100 character")
-        String designation
+        @NotBlank(message = "DesignationID is Required")
+        String designationId
 ){
 }

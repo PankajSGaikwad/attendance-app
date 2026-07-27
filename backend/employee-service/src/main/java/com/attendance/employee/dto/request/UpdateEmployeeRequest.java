@@ -21,12 +21,10 @@ public record UpdateEmployeeRequest(
         )
         String phone,
 
-        @NotBlank(message = "Department is required")
-        @Size(max = 100, message = "Department cannot exceed 100 characters")
-        String department,
+        @NotBlank(message = "DepartmentID is Required")
+        String departmentId,
 
-        @NotBlank(message = "Designation is required")
-        @Size(max = 100, message = "Designation cannot exceed 100 characters")
-        String designation
+        @NotBlank(message = "DesignationID is Required")
+        String designationId
 ) {
 }

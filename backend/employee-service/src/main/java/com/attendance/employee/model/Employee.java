@@ -26,10 +26,17 @@ public class Employee {
     private String firstName;
     private String lastName;
     private String phone;
-    private String department;
-    private String designation;
 
-    private EmployeeStatus status;
+    @Indexed
+    private String departmentId;
+
+    @Indexed
+    private String designationId;
+
+    private EmployeeStatus status = EmployeeStatus.DRAFT;
+
+    //False until the administrator/supervisor approves the profile.
+    private boolean active;
 
     private String profilePhotoId;
     private String employeeCode;
