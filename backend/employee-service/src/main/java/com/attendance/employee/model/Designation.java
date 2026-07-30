@@ -23,7 +23,7 @@ import java.time.Instant;
                 unique = true
         ),
         @CompoundIndex(
-                name = "department_designation_code_unique",
+                name = "department_designation_name_unique",
                 def = "{'departmentId': 1, 'normalizedName': 1}",
                 unique = true
         )

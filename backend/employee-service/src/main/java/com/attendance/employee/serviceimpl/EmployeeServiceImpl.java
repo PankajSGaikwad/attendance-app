@@ -3,13 +3,17 @@ package com.attendance.employee.serviceimpl;
 import com.attendance.employee.dto.request.CreateEmployeeRequest;
 import com.attendance.employee.dto.request.UpdateEmployeeRequest;
 import com.attendance.employee.dto.response.EmployeeResponse;
-import com.attendance.employee.exception.DuplicateEmployeeException;
-import com.attendance.employee.exception.EmployeeNotFoundException;
-import com.attendance.employee.exception.InvalidEmployeeStateException;
+import com.attendance.employee.dto.response.EmployeeWorkContextResponse;
+import com.attendance.employee.exception.*;
+import com.attendance.employee.model.Department;
+import com.attendance.employee.model.Designation;
 import com.attendance.employee.model.Employee;
 import com.attendance.employee.model.EmployeeStatus;
+import com.attendance.employee.repository.DepartmentRepository;
+import com.attendance.employee.repository.DesignationRepository;
 import com.attendance.employee.repository.EmployeeRepository;
 import com.attendance.employee.service.EmployeeService;
+import com.attendance.employee.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,12 +28,14 @@ import java.util.Locale;
 public class EmployeeServiceImpl implements EmployeeService {
 
     private final EmployeeRepository employeeRepository;
+    private final DepartmentRepository departmentRepository;
+    private final DesignationRepository designationRepository;
 
     @Override
     public EmployeeResponse create(CreateEmployeeRequest request) {
 
         String userId= request.userId().trim();
-        String normalizedEmail= normalizedEmail(request.email());
+        String email= TextNormalizer.email(request.email());
 
         if (employeeRepository.existsByUserId(userId)){
             throw new DuplicateEmployeeException(
@@ -37,33 +43,33 @@ public class EmployeeServiceImpl implements EmployeeService {
             );
         }
 
-        if (employeeRepository.existsByEmail(normalizedEmail)){
+        if (employeeRepository.existsByEmail(email)){
             throw new DuplicateEmployeeException(
                     "An Employee Profile For this EmailID already exists"
             );
         }
 
+        ProfileReferences references = validateReferences(request.departmentId(), request.designationId());
+
+
         Instant now=Instant.now();
 
         Employee employee = new Employee();
         employee.setUserId(userId);
-        employee.setFirstName(request.firstName());
-        employee.setLastName(request.lastName());
-        employee.setEmail(normalizedEmail);
-        employee.setPhone(request.phone());
-        employee.setDepartment(request.department());
-        employee.setDesignation(request.designation());
+        employee.setFirstName(TextNormalizer.displayName(request.firstName()));
+        employee.setLastName(TextNormalizer.displayName(request.lastName()));
+        employee.setEmail(email);
+        employee.setPhone(request.phone().trim());
+        employee.setDepartmentId(references.department.getId());
+        employee.setDesignationId(references.designation.getId());
         employee.setStatus(EmployeeStatus.DRAFT);
+        employee.setActive(false);
         employee.setCreatedAt(now);
         employee.setUpdatedAt(now);
 
         Employee savedEmployee = employeeRepository.save(employee);
 
-        return toResponse(savedEmployee);
-    }
-
-    private String normalizedEmail(String email){
-        return email.trim().toLowerCase(Locale.ROOT);
+        return toResponse(savedEmployee, references.department(), references.designation());
     }
 
     @Override
@@ -113,13 +119,14 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         ensureProfileCanBeEdited(employee);
 
-        employee.setFirstName(request.firstName());
-        employee.setLastName(request.lastName());
-        employee.setPhone(request.phone());
-        employee.setDesignation(request.designation());
-        employee.setDepartment(request.department());
-        employee.setUpdatedAt(Instant.now());
+        ProfileReferences references = validateReferences(request.departmentId(), request.designationId());
 
+        employee.setFirstName(TextNormalizer.displayName(request.firstName()));
+        employee.setLastName(TextNormalizer.displayName(request.lastName()));
+        employee.setPhone(request.phone().trim());
+        employee.setDepartmentId(references.department.getId());
+        employee.setDesignationId(references.designation.getId());
+        employee.setUpdatedAt(Instant.now());
 
          //A rejected profile returns to DRAFT when edited The employee must submit it again afterward.
         if (employee.getStatus() == EmployeeStatus.REJECTED){
@@ -127,7 +134,10 @@ public class EmployeeServiceImpl implements EmployeeService {
             employee.setRejectionReason(null);
         }
 
-        return toResponse(employeeRepository.save(employee));
+        Employee savedEmployee = employeeRepository.save(employee);
+
+
+        return  toResponse(savedEmployee, references.department(), references.designation());
 
     }
 
@@ -163,6 +173,44 @@ public class EmployeeServiceImpl implements EmployeeService {
         employeeRepository.delete(employee);
     }
 
+    @Override
+    public EmployeeWorkContextResponse getWorkContext(String employeeId) {
+        Employee employee = findEmployee(employeeId);
+
+        return new EmployeeWorkContextResponse(
+                employee.getId(),
+                employee.getUserId(),
+                employee.getEmployeeCode(),
+                employee.getDepartmentId(),
+                employee.getDesignationId(),
+                employee.getStatus(),
+                employee.isActive()
+        );
+    }
+
+    private ProfileReferences validateReferences(String departmentId, String designationId){
+
+        Department department = departmentRepository.findById(departmentId).orElseThrow(() ->
+                new ResourceNotFoundException("Department Not Found With Id: "+ departmentId));
+        if (!department.isActive()){
+            throw new InvalidReferenceException("Selected Department Is InActive");
+        }
+
+        Designation designation = designationRepository.findById(designationId).orElseThrow(()->
+                new ResourceNotFoundException("Designation Not Found With ID: " + designationId));
+        if(!designation.isActive()){
+            throw new InvalidReferenceException("Selected Designation is InActive");
+        }
+
+        if (!designation.getDepartmentId().equals(department.getId())){
+            throw new InvalidReferenceException("Selected designation does not belong to selected department");
+        }
+
+        return new ProfileReferences(
+                department,designation
+        );
+    }
+
     private void ensureProfileCanBeEdited(Employee employee) {
         EmployeeStatus status = employee.getStatus();
         if (status != EmployeeStatus.DRAFT && status != EmployeeStatus.REJECTED) {
@@ -174,11 +222,17 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
     }
 
+    private EmployeeResponse toResponse(Employee employee){
+        Department department = departmentRepository.findById(employee.getDepartmentId()).orElse(null);
 
+        Designation designation = designationRepository.findById(employee.getDesignationId()).orElse(null);
+
+        return toResponse(employee, department, designation);
+    }
 
     private EmployeeResponse toResponse(
-            Employee employee
-    ){
+            Employee employee, Department department, Designation designation
+            ){
         return new EmployeeResponse(
                 employee.getId(),
                 employee.getUserId(),
@@ -186,9 +240,16 @@ public class EmployeeServiceImpl implements EmployeeService {
                 employee.getLastName(),
                 employee.getEmail(),
                 employee.getPhone(),
-                employee.getDepartment(),
-                employee.getDesignation(),
+
+                employee.getDepartmentId(),
+                department == null ? null : department.getName(),
+
+                employee.getDesignationId(),
+                designation == null ? null : designation.getName(),
+
                 employee.getStatus(),
+                employee.isActive(),
+
                 employee.getProfilePhotoId(),
                 employee.getEmployeeCode(),
                 employee.getRejectionReason(),
@@ -197,5 +258,11 @@ public class EmployeeServiceImpl implements EmployeeService {
                 employee.getCreatedAt(),
                 employee.getUpdatedAt()
         );
+    }
+
+    private record ProfileReferences(
+            Department department,
+            Designation designation
+    ){
     }
 }

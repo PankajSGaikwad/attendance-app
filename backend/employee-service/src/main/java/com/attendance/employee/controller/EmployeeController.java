@@ -22,15 +22,9 @@ public class EmployeeController {
     private final EmployeeService employeeService;
 
     @PostMapping
-    public ResponseEntity<EmployeeResponse> create(
-            @Valid @RequestBody CreateEmployeeRequest request
-            )
-    {
-        EmployeeResponse response =
-                employeeService.create(request);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED).body(response);
+    @ResponseStatus(HttpStatus.CREATED)
+    public EmployeeResponse create(@Valid @RequestBody CreateEmployeeRequest request){
+        return employeeService.create(request);
     }
 
     @GetMapping("/{employeeId}")
@@ -40,7 +34,7 @@ public class EmployeeController {
         return employeeService.getById(employeeId);
     }
 
-    @GetMapping("/User-id/{userId}")
+    @GetMapping("/by-user/{userId}")
     public EmployeeResponse getByUserId(
             @PathVariable String userId
     ){
