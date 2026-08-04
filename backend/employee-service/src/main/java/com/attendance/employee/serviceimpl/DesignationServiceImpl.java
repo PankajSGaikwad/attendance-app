@@ -4,6 +4,7 @@ import com.attendance.employee.dto.request.BulkCreateDesignationRequest;
 import com.attendance.employee.dto.request.CreateDesignationRequest;
 import com.attendance.employee.dto.request.UpdateDesignationRequest;
 import com.attendance.employee.dto.response.DepartmentOptionResponse;
+import com.attendance.employee.dto.response.DesignationOptionResponse;
 import com.attendance.employee.dto.response.DesignationResponse;
 import com.attendance.employee.exception.DuplicateResourceException;
 import com.attendance.employee.exception.InvalidReferenceException;
@@ -108,11 +109,11 @@ public class DesignationServiceImpl implements DesignationService {
     }
 
     @Override
-    public List<DepartmentOptionResponse> getOptions(String departmentId) {
+    public List<DesignationOptionResponse> getOptions(String departmentId) {
         requireActiveDepartment(departmentId);
 
         return designationRepository.findByDepartmentIdAndActiveTrueOrderByNameAsc(departmentId)
-                .stream().map(designation -> new DepartmentOptionResponse(
+                .stream().map(designation -> new DesignationOptionResponse(
                         designation.getId(),
                         designation.getCode(),
                         designation.getName()
