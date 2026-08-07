@@ -29,3 +29,10 @@ management:
   endpoint:
     health:
       show-details: always
+
+app:
+  security:
+    jwt:
+      secret-base64: ${JWT_SECRET_BASE64}
+      issuer: attendance-auth-service
+      audience: attendance-api

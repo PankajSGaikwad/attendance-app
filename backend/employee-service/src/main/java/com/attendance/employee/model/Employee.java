@@ -39,14 +39,22 @@ public class Employee {
     private boolean active;
 
     private String profilePhotoId;
+
+    @Indexed(unique = true, sparse = true)
     private String employeeCode;
+
+    @Indexed(unique = true, sparse = true)
     private String qrToken;
+    private Instant qrIssuedAt;
     private String rejectionReason;
 
     private Instant submittedAt;
     private Instant approvedAt;
-    private Instant approvedBy;
+    private String approvedBy;
 
     private Instant createdAt;
     private Instant updatedAt;
+
+    private Instant rejectedAt;
+    private String rejectedBy;
 }

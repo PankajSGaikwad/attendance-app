@@ -1,0 +1,89 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+
+            - id: auth-service-route
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/api/auth/**
+
+            - id: auth-admin-route
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/api/admin/users/**
+
+            - id: employee-profile-route
+              uri: lb://EMPLOYEE-SERVICE
+              predicates:
+                - Path=/api/employees/**
+
+            - id: employee-admin-route
+              uri: lb://EMPLOYEE-SERVICE
+              predicates:
+                - Path=/api/admin/employees/**
+
+            - id: department-route
+              uri: lb://EMPLOYEE-SERVICE
+              predicates:
+                - Path=/api/departments/**
+
+            - id: designation-route
+              uri: lb://EMPLOYEE-SERVICE
+              predicates:
+                - Path=/api/designations/**
+
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - ${FRONTEND_URL:http://localhost:5173}
+
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+
+                allowedHeaders:
+                  - "*"
+
+                exposedHeaders:
+                  - Content-Disposition
+
+                allowCredentials: true
+
+                maxAge: 3600
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  security:
+    jwt:
+      secret-base64: ${JWT_SECRET_BASE64}
+      issuer: attendance-auth-service
+      audience: attendance-api

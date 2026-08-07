@@ -38,7 +38,9 @@ public class DepartmentController {
     }
 
     @GetMapping("/options")
-    @PreAuthorize("isAuthenticated()")//This allows employees to load the department dropdown.
+    @PreAuthorize(
+            "hasAnyRole('ADMIN', 'SUPERVISOR', 'EMPLOYEE')"
+    )//This allows employees to load the department dropdown.
     public List<DepartmentOptionResponse> getOptions(){
         return departmentService.getOptions();
     }

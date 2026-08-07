@@ -39,13 +39,17 @@ public class DepartmentDesignationController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(
+            "hasAnyRole('ADMIN', 'SUPERVISOR')"
+    )
     public List<DesignationResponse> getAll(@PathVariable String departmentId, @RequestParam(defaultValue = "false") boolean activeOnly){
         return designationService.getByDepartment(departmentId, activeOnly);
     }
 
     @GetMapping("/options")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize(
+            "hasAnyRole('ADMIN', 'SUPERVISOR', 'EMPLOYEE')"
+    )
     public List<DesignationOptionResponse> getOptions(@PathVariable String departmentId){
         return designationService.getOptions(departmentId);
     }
