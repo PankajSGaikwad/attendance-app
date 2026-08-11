@@ -41,6 +41,11 @@ spring:
               predicates:
                 - Path=/api/designations/**
 
+            - id: shift-service-route
+              uri: lb://SHIFT-SERVICE
+              predicates:
+                - Path=/api/shifts/**,/api/shift-assignments/**
+
           globalcors:
             add-to-simple-url-handler-mapping: true
 
