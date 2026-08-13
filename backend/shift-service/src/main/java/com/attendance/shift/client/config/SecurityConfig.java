@@ -1,5 +1,6 @@
 package com.attendance.shift.client.config;
 
+import com.attendance.shift.security.InternalApiKeyAuthenticationFilter;
 import com.attendance.shift.security.RestAccessDeniedHandler;
 import com.attendance.shift.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.util.StringUtils;
 
@@ -37,6 +39,9 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtProperties jwtProperties;
+
+    private final InternalApiKeyAuthenticationFilter
+            internalApiKeyAuthenticationFilter;
 
     private final RestAuthenticationEntryPoint
             authenticationEntryPoint;
@@ -203,6 +208,10 @@ public class SecurityConfig {
                                         jwtAuthenticationConverter
                                 )
                         )
+                )
+                .addFilterBefore(
+                        internalApiKeyAuthenticationFilter,
+                        BearerTokenAuthenticationFilter.class
                 )
                 .exceptionHandling(exceptions ->
                         exceptions

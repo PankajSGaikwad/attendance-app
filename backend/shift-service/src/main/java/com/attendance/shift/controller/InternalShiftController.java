@@ -15,7 +15,14 @@ import java.time.Instant;
 @RestController
 @RequestMapping("/internal/shifts")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'SUPERVISOR', 'KIOSK')")
+@PreAuthorize(
+        "hasAnyRole(" +
+                "'INTERNAL_SERVICE'," +
+                "'ADMIN'," +
+                "'SUPERVISOR'," +
+                "'KIOSK'" +
+                ")"
+)
 public class InternalShiftController {
     private final ShiftResolutionService shiftResolutionService;
 

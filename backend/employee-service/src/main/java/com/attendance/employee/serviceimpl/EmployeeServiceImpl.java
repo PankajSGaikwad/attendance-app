@@ -460,6 +460,7 @@ public class EmployeeServiceImpl
 
         return new EmployeeQrContextResponse(
                 employee.getId(),
+                employee.getUserId(),
                 employee.getEmployeeCode(),
                 employee.getFirstName()
                         + " "

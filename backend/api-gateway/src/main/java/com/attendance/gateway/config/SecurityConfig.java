@@ -110,6 +110,12 @@ public class SecurityConfig {
                                 "/api/auth/refresh",
                                 "/api/auth/logout"
                         ).permitAll()
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/api/attendance/public/scan/start",
+                                "/api/attendance/public/scan/complete"
+                        )
+                        .permitAll()
                         .anyExchange().authenticated()).oauth2ResourceServer(oauth ->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .build();
     }

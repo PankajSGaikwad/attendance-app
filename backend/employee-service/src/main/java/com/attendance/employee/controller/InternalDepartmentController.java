@@ -13,7 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/internal/departments")
 @RequiredArgsConstructor
 @PreAuthorize(
-        "hasAnyRole('ADMIN', 'SUPERVISOR', 'KIOSK')"
+        "hasAnyRole(" +
+                "'INTERNAL_SERVICE'," +
+                "'ADMIN'," +
+                "'SUPERVISOR'," +
+                "'KIOSK'" +
+                ")"
 )
 public class InternalDepartmentController {
     private final DepartmentService departmentService;

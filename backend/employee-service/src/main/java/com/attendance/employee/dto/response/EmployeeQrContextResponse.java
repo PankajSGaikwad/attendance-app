@@ -4,6 +4,7 @@ import com.attendance.employee.model.EmployeeStatus;
 
 public record EmployeeQrContextResponse(
         String employeeId,
+        String userId,
         String employeeCode,
         String fullName,
         String departmentId,

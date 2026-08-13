@@ -46,6 +46,11 @@ spring:
               predicates:
                 - Path=/api/shifts/**,/api/shift-assignments/**
 
+            - id: attendance-service-route
+              uri: lb://ATTENDANCE-SERVICE
+              predicates:
+                - Path=/api/attendance/**,/api/admin/attendance/**
+
           globalcors:
             add-to-simple-url-handler-mapping: true
 

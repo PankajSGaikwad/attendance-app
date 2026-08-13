@@ -36,3 +36,6 @@ app:
       secret-base64: ${JWT_SECRET_BASE64}
       issuer: attendance-auth-service
       audience: attendance-api
+
+  internal:
+    api-key: ${INTERNAL_API_KEY}
