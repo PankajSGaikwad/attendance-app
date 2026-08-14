@@ -116,6 +116,11 @@ public class SecurityConfig {
                                 "/api/attendance/public/scan/complete"
                         )
                         .permitAll()
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/api/media/public/attendance-photo"
+                        )
+                        .permitAll()
                         .anyExchange().authenticated()).oauth2ResourceServer(oauth ->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .build();
     }

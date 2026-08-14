@@ -2,6 +2,7 @@ package com.attendance.attendanceservice.serviceimpl;
 
 import com.attendance.attendanceservice.client.EmployeeDirectoryGateway;
 import com.attendance.attendanceservice.client.ShiftDirectoryGateway;
+import com.attendance.attendanceservice.client.config.MediaDirectoryGateway;
 import com.attendance.attendanceservice.dto.response.EffectiveShiftResponse;
 import com.attendance.attendanceservice.dto.response.EmployeeQrContextResponse;
 import com.attendance.attendanceservice.config.AttendanceProperties;
@@ -43,6 +44,9 @@ public class AttendanceScanServiceImpl
 
     private final ShiftDirectoryGateway
             shiftDirectoryGateway;
+
+    private final MediaDirectoryGateway
+            mediaDirectoryGateway;
 
     private final QrValueParser qrValueParser;
     private final AttemptTokenService attemptTokenService;
@@ -374,12 +378,20 @@ public class AttendanceScanServiceImpl
                                 )
                         );
 
+        /*
+         * Validate that the attempt belongs to
+         * the expected attendance flow.
+         */
         if (attempt.getSource() != expectedSource) {
             throw new ForbiddenAttendanceException(
                     "Attendance attempt source does not match"
             );
         }
 
+        /*
+         * For authenticated scanning, make sure
+         * the attempt belongs to the logged-in user.
+         */
         if (expectedSource
                 == AttendanceSource.AUTHENTICATED_SCAN
                 && !authenticatedUserId.equals(
@@ -391,14 +403,20 @@ public class AttendanceScanServiceImpl
             );
         }
 
+        /*
+         * Idempotency:
+         *
+         * If this attempt was already completed,
+         * return the existing result instead of
+         * creating another punch.
+         */
         if (attempt.getStatus()
                 == AttendanceAttemptStatus.COMPLETED) {
 
             AttendanceRecord existing =
                     attendanceRecordRepository
                             .findById(
-                                    attempt
-                                            .getAttendanceRecordId()
+                                    attempt.getAttendanceRecordId()
                             )
                             .orElseThrow(() ->
                                     new ResourceNotFoundException(
@@ -415,7 +433,16 @@ public class AttendanceScanServiceImpl
 
         Instant now = Instant.now();
 
-        if (now.isAfter(attempt.getExpiresAt())) {
+        /*
+         * Validate attempt expiry.
+         *
+         * Employee must upload and submit the
+         * attendance photo within 60 seconds.
+         */
+        if (now.isAfter(
+                attempt.getExpiresAt()
+        )) {
+
             attempt.setStatus(
                     AttendanceAttemptStatus.EXPIRED
             );
@@ -429,6 +456,30 @@ public class AttendanceScanServiceImpl
             );
         }
 
+        /*
+         * ---------------------------------------------------------
+         * MEDIA SERVICE VALIDATION
+         * ---------------------------------------------------------
+         *
+         * Verify that:
+         *
+         * 1. photoId actually exists in Media Service
+         * 2. photo belongs to this attendance attempt
+         * 3. photo belongs to this employee
+         * 4. photo was uploaded for the correct scan source
+         *
+         * Do this BEFORE creating the punch or changing
+         * the attendance record.
+         */
+        mediaDirectoryGateway
+                .requireAttendancePhoto(
+                        request.photoId(),
+                        attempt.getId(),
+                        attempt.getEmployeeId(),
+                        attempt.getSource().name()
+                );
+
+
         PunchSnapshot punch =
                 createPunchSnapshot(
                         attempt,
@@ -441,19 +492,21 @@ public class AttendanceScanServiceImpl
         if (attempt.getAction()
                 == AttendanceAction.PUNCH_IN) {
 
-            attendance = applyPunchIn(
-                    attempt,
-                    punch,
-                    now
-            );
+            attendance =
+                    applyPunchIn(
+                            attempt,
+                            punch,
+                            now
+                    );
 
         } else {
 
-            attendance = applyPunchOut(
-                    attempt,
-                    punch,
-                    now
-            );
+            attendance =
+                    applyPunchOut(
+                            attempt,
+                            punch,
+                            now
+                    );
         }
 
         attempt.setAttendanceRecordId(
@@ -464,7 +517,9 @@ public class AttendanceScanServiceImpl
                 AttendanceAttemptStatus.COMPLETED
         );
 
-        attempt.setCompletedAt(now);
+        attempt.setCompletedAt(
+                now
+        );
 
         attendanceAttemptRepository.save(
                 attempt

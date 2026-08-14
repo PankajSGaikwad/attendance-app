@@ -51,6 +51,11 @@ spring:
               predicates:
                 - Path=/api/attendance/**,/api/admin/attendance/**
 
+            - id: media-service-route
+              uri: lb://MEDIA-SERVICE
+              predicates:
+                - Path=/api/media/**,/api/admin/media/**
+
           globalcors:
             add-to-simple-url-handler-mapping: true
 

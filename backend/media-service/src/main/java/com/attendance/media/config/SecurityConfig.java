@@ -1,10 +1,9 @@
-package com.attendance.attendanceservice.config;
+package com.attendance.media.config;
 
-import com.attendance.attendanceservice.security.InternalApiKeyAuthenticationFilter;
-import com.attendance.attendanceservice.security.RestAccessDeniedHandler;
-import com.attendance.attendanceservice.security.RestAuthenticationEntryPoint;
+import com.attendance.media.security.InternalApiKeyAuthenticationFilter;
+import com.attendance.media.security.RestAccessDeniedHandler;
+import com.attendance.media.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,12 +17,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.Jwt;
-
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-
-import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
@@ -39,53 +33,43 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
     private final JwtProperties jwtProperties;
 
-    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final InternalApiKeyAuthenticationFilter
+            internalApiKeyAuthenticationFilter;
+
+    private final RestAuthenticationEntryPoint
+            authenticationEntryPoint;
 
     private final RestAccessDeniedHandler
             accessDeniedHandler;
 
-    private final InternalApiKeyAuthenticationFilter
-            internalApiKeyAuthenticationFilter;
-
     @Bean
     public SecretKey jwtSecretKey() {
 
-        String encodedSecret =
+        String encoded =
                 jwtProperties.getSecretBase64();
 
-        if (!StringUtils.hasText(encodedSecret)) {
+        if (!StringUtils.hasText(encoded)) {
             throw new IllegalStateException(
                     "JWT_SECRET_BASE64 is required"
             );
         }
 
-        byte[] keyBytes;
+        byte[] bytes =
+                Base64.getDecoder()
+                        .decode(encoded.trim());
 
-        try {
-            keyBytes = Base64
-                    .getDecoder()
-                    .decode(encodedSecret.trim());
-
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException(
-                    "JWT_SECRET_BASE64 must contain valid Base64",
-                    exception
-            );
-        }
-
-        if (keyBytes.length < 32) {
+        if (bytes.length < 32) {
             throw new IllegalStateException(
                     "JWT secret must contain at least 32 bytes"
             );
         }
 
         return new SecretKeySpec(
-                keyBytes,
+                bytes,
                 "HmacSHA256"
         );
     }
@@ -103,45 +87,40 @@ public class SecurityConfig {
                         )
                         .build();
 
-        OAuth2TokenValidator<Jwt>
-                issuerValidator =
-                JwtValidators.createDefaultWithIssuer(
-                        jwtProperties.getIssuer()
-                );
+        OAuth2TokenValidator<Jwt> issuer =
+                JwtValidators
+                        .createDefaultWithIssuer(
+                                jwtProperties.getIssuer()
+                        );
 
-        OAuth2TokenValidator<Jwt>
-                audienceValidator = jwt -> {
+        OAuth2TokenValidator<Jwt> audience =
+                jwt -> {
 
-            List<String> audience =
-                    jwt.getAudience();
+                    List<String> audiences =
+                            jwt.getAudience();
 
-            boolean valid =
-                    audience != null
-                            && audience.contains(
-                            jwtProperties
-                                    .getAudience()
-                    );
+                    if (audiences != null
+                            && audiences.contains(
+                            jwtProperties.getAudience()
+                    )) {
+                        return OAuth2TokenValidatorResult
+                                .success();
+                    }
 
-            if (valid) {
-                return OAuth2TokenValidatorResult
-                        .success();
-            }
-
-            OAuth2Error error =
-                    new OAuth2Error(
-                            "invalid_token",
-                            "Required JWT audience is missing",
-                            null
-                    );
-
-            return OAuth2TokenValidatorResult
-                    .failure(error);
-        };
+                    return OAuth2TokenValidatorResult
+                            .failure(
+                                    new OAuth2Error(
+                                            "invalid_token",
+                                            "Required JWT audience is missing",
+                                            null
+                                    )
+                            );
+                };
 
         decoder.setJwtValidator(
                 new DelegatingOAuth2TokenValidator<>(
-                        issuerValidator,
-                        audienceValidator
+                        issuer,
+                        audience
                 )
         );
 
@@ -152,23 +131,17 @@ public class SecurityConfig {
     public JwtAuthenticationConverter
     jwtAuthenticationConverter() {
 
-        JwtGrantedAuthoritiesConverter
-                roleConverter =
+        JwtGrantedAuthoritiesConverter roles =
                 new JwtGrantedAuthoritiesConverter();
 
-        roleConverter.setAuthoritiesClaimName(
-                "roles"
-        );
-
-        roleConverter.setAuthorityPrefix(
-                "ROLE_"
-        );
+        roles.setAuthoritiesClaimName("roles");
+        roles.setAuthorityPrefix("ROLE_");
 
         JwtAuthenticationConverter converter =
                 new JwtAuthenticationConverter();
 
         converter.setJwtGrantedAuthoritiesConverter(
-                roleConverter
+                roles
         );
 
         return converter;
@@ -177,10 +150,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter converter
     ) throws Exception {
 
         return http
+
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -206,20 +180,21 @@ public class SecurityConfig {
                         )
                         .permitAll()
 
+                        // Public attendance photo upload
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/attendance/public/scan/start",
-                                "/api/attendance/public/scan/complete"
+                                "/api/media/public/attendance-photo"
                         )
                         .permitAll()
 
+                        // Only internal services
                         .requestMatchers(
                                 "/internal/**"
                         )
                         .hasRole("INTERNAL_SERVICE")
 
                         .requestMatchers(
-                                "/api/admin/attendance/**"
+                                "/api/admin/media/**"
                         )
                         .hasAnyRole(
                                 "ADMIN",
@@ -230,17 +205,17 @@ public class SecurityConfig {
                         .authenticated()
                 )
 
-                .addFilterBefore(
-                        internalApiKeyAuthenticationFilter,
-                        BearerTokenAuthenticationFilter.class
-                )
-
                 .oauth2ResourceServer(oauth ->
                         oauth.jwt(jwt ->
                                 jwt.jwtAuthenticationConverter(
-                                        jwtAuthenticationConverter
+                                        converter
                                 )
                         )
+                )
+
+                .addFilterBefore(
+                        internalApiKeyAuthenticationFilter,
+                        BearerTokenAuthenticationFilter.class
                 )
 
                 .exceptionHandling(exceptions ->
