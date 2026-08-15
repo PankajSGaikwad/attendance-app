@@ -10,24 +10,21 @@ import {
 
 import ProtectedRoute from "./auth/ProtectedRoute";
 
-
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
-
 import AppShell from "./components/layout/AppShell";
-
 
 import Dashboard from "./pages/employee/Dashboard";
 import Attendance from "./pages/employee/Attendance";
 import CompleteProfile from "./pages/employee/CompleteProfile";
 import ProfilePending from "./pages/employee/ProfilePending";
 
-
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Employees from "./pages/admin/Employees";
 import EmployeeReview from "./pages/admin/EmployeeReview";
 import AdminAttendance from "./pages/admin/Attendance";
+import Users from "./pages/admin/Users";
 
 
 function App() {
@@ -37,7 +34,6 @@ function App() {
     <AuthProvider>
 
       <Routes>
-
 
         {/* =========================================
             PUBLIC
@@ -74,7 +70,6 @@ function App() {
               <AppShell />
             }
           >
-
 
             {/* =====================================
                 EMPLOYEE
@@ -139,13 +134,21 @@ function App() {
               }
             />
 
-            <Route
-  path="/admin/attendance"
-  element={
-    <AdminAttendance />
-  }
-/>
 
+            <Route
+              path="/admin/attendance"
+              element={
+                <AdminAttendance />
+              }
+            />
+
+
+            <Route
+              path="/admin/users"
+              element={
+                <Users />
+              }
+            />
 
           </Route>
 
