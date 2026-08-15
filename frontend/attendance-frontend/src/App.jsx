@@ -27,6 +27,7 @@ import ProfilePending from "./pages/employee/ProfilePending";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Employees from "./pages/admin/Employees";
 import EmployeeReview from "./pages/admin/EmployeeReview";
+import AdminAttendance from "./pages/admin/Attendance";
 
 
 function App() {
@@ -137,6 +138,13 @@ function App() {
                 <EmployeeReview />
               }
             />
+
+            <Route
+  path="/admin/attendance"
+  element={
+    <AdminAttendance />
+  }
+/>
 
 
           </Route>
