@@ -53,7 +53,7 @@ public class DepartmentController {
         return departmentService.getById(departmentId);
     }
 
-    @PutMapping("/departmentId")
+    @PutMapping("/{departmentId}")
     @PreAuthorize(
             "hasAnyRole('ADMIN', 'SUPERVISOR')"
     )

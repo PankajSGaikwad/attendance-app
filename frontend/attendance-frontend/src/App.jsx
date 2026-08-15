@@ -25,6 +25,7 @@ import Employees from "./pages/admin/Employees";
 import EmployeeReview from "./pages/admin/EmployeeReview";
 import AdminAttendance from "./pages/admin/Attendance";
 import Users from "./pages/admin/Users";
+import Departments from "./pages/admin/Departments";
 
 
 function App() {
@@ -147,6 +148,13 @@ function App() {
               path="/admin/users"
               element={
                 <Users />
+              }
+            />
+
+            <Route
+              path="/admin/departments"
+              element={
+                <Departments />
               }
             />
 

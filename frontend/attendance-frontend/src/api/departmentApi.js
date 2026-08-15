@@ -1,11 +1,51 @@
 import api from "./client";
 
-export const getDepartmentOptions = () =>
-  api.get("/api/departments/options");
+export const getDepartments = (
+  activeOnly = false
+) =>
+  api.get(
+    "/api/departments",
+    {
+      params: {
+        activeOnly,
+      },
+    }
+  );
 
-export const getDesignationOptions = (
+export const getDepartmentById = (
   departmentId
 ) =>
   api.get(
-    `/api/departments/${departmentId}/designations/options`
+    `/api/departments/${departmentId}`
+  );
+
+export const createDepartment = (
+  payload
+) =>
+  api.post(
+    "/api/departments",
+    payload
+  );
+
+export const updateDepartment = (
+  departmentId,
+  payload
+) =>
+  api.put(
+    `/api/departments/${departmentId}`,
+    payload
+  );
+
+export const activateDepartment = (
+  departmentId
+) =>
+  api.patch(
+    `/api/departments/${departmentId}/activate`
+  );
+
+export const deactivateDepartment = (
+  departmentId
+) =>
+  api.patch(
+    `/api/departments/${departmentId}/deactivate`
   );
