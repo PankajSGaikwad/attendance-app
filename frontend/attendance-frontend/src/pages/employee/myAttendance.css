@@ -1,0 +1,1051 @@
+/* =========================================================
+   MY ATTENDANCE
+   ========================================================= */
+
+.my-attendance-page {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+
+/* =========================================================
+   HEADER ACTION
+   ========================================================= */
+
+.my-attendance-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 40px;
+  padding: 0 15px;
+
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.04);
+  color: #d9e2f1;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.my-attendance-refresh:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.my-attendance-refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.my-attendance-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 18px;
+  padding: 13px 15px;
+
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: 12px;
+
+  background: rgba(127, 29, 29, 0.16);
+
+  color: #fecaca;
+
+  font-size: 13px;
+}
+
+.my-attendance-error span {
+  flex: 1;
+}
+
+.my-attendance-error button {
+  border: 0;
+  background: transparent;
+  color: #93c5fd;
+
+  font-weight: 700;
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   SUMMARY
+   ========================================================= */
+
+.attendance-summary-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(5, minmax(0, 1fr));
+
+  gap: 14px;
+
+  margin-bottom: 20px;
+}
+
+.attendance-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  min-height: 92px;
+  padding: 18px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 15px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.045),
+      rgba(255, 255, 255, 0.018)
+    );
+
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.12);
+}
+
+.summary-icon {
+  width: 42px;
+  height: 42px;
+
+  display: grid;
+  place-items: center;
+
+  flex: 0 0 42px;
+
+  border-radius: 12px;
+
+  background:
+    rgba(37, 99, 235, 0.14);
+
+  color: #60a5fa;
+}
+
+.attendance-summary-card span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #8490a4;
+
+  font-size: 12px;
+}
+
+.attendance-summary-card strong {
+  display: block;
+
+  color: #f5f7fb;
+
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+
+/* =========================================================
+   MAIN PANEL
+   ========================================================= */
+
+.attendance-panel {
+  overflow: hidden;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 17px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.035),
+      rgba(255, 255, 255, 0.012)
+    );
+}
+
+
+/* =========================================================
+   PANEL HEADER
+   ========================================================= */
+
+.attendance-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 22px 24px 16px;
+}
+
+.attendance-panel-eyebrow {
+  margin-bottom: 6px;
+
+  color: #60a5fa;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 0.16em;
+}
+
+.attendance-filter-header h2 {
+  margin: 0;
+
+  color: #f7f9fc;
+
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.attendance-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 38px;
+  padding: 0 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 9px;
+
+  background: rgba(255, 255, 255, 0.035);
+
+  color: #cbd5e1;
+
+  font-size: 12px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.attendance-export-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.attendance-export-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   FILTERS
+   ========================================================= */
+
+.attendance-filters {
+  display: grid;
+
+  grid-template-columns:
+    minmax(240px, 1fr)
+    180px
+    180px;
+
+  gap: 10px;
+
+  padding: 0 24px 18px;
+}
+
+.attendance-search {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+}
+
+.attendance-search svg {
+  position: absolute;
+  left: 13px;
+
+  color: #64748b;
+}
+
+.attendance-search input,
+.attendance-filters select {
+  width: 100%;
+  height: 42px;
+
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+
+  background: rgba(3, 7, 18, 0.70);
+
+  color: #e5e7eb;
+
+  outline: none;
+
+  font-size: 13px;
+}
+
+.attendance-search input {
+  padding: 0 14px 0 39px;
+}
+
+.attendance-filters select {
+  padding: 0 12px;
+}
+
+.attendance-search input::placeholder {
+  color: #596579;
+}
+
+.attendance-search input:focus,
+.attendance-filters select:focus {
+  border-color: rgba(59, 130, 246, 0.65);
+
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.10);
+}
+
+
+/* =========================================================
+   LOADING
+   ========================================================= */
+
+.attendance-loading {
+  min-height: 300px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 12px;
+
+  color: #8490a4;
+
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   EMPTY
+   ========================================================= */
+
+.attendance-empty {
+  min-height: 320px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 40px;
+
+  text-align: center;
+}
+
+.attendance-empty-icon {
+  width: 58px;
+  height: 58px;
+
+  display: grid;
+  place-items: center;
+
+  margin-bottom: 15px;
+
+  border-radius: 16px;
+
+  background: rgba(37, 99, 235, 0.10);
+
+  color: #60a5fa;
+}
+
+.attendance-empty h3 {
+  margin: 0 0 7px;
+
+  color: #e5e7eb;
+
+  font-size: 17px;
+}
+
+.attendance-empty p {
+  max-width: 420px;
+
+  margin: 0;
+
+  color: #69768a;
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+
+/* =========================================================
+   TABLE
+   ========================================================= */
+
+.attendance-table-wrapper {
+  width: 100%;
+
+  overflow-x: auto;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.06);
+}
+
+.attendance-table {
+  width: 100%;
+
+  min-width: 930px;
+
+  border-collapse: collapse;
+}
+
+.attendance-table th {
+  padding: 13px 16px;
+
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.06);
+
+  color: #667085;
+
+  background:
+    rgba(255, 255, 255, 0.015);
+
+  text-align: left;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attendance-table td {
+  padding: 15px 16px;
+
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.055);
+
+  color: #aeb9c9;
+
+  font-size: 13px;
+}
+
+.attendance-table tbody tr {
+  transition:
+    background 150ms ease;
+}
+
+.attendance-table tbody tr:hover {
+  background:
+    rgba(255, 255, 255, 0.025);
+}
+
+.attendance-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+
+/* =========================================================
+   CELLS
+   ========================================================= */
+
+.date-cell,
+.shift-cell {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.date-cell strong,
+.shift-cell strong {
+  color: #e8edf5;
+
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.date-cell .late-label {
+  width: fit-content;
+
+  padding: 2px 6px;
+
+  border-radius: 5px;
+
+  background: rgba(245, 158, 11, 0.12);
+
+  color: #fbbf24;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.shift-cell span {
+  color: #667085;
+
+  font-size: 11px;
+}
+
+.time-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  white-space: nowrap;
+
+  color: #b6c1d1;
+}
+
+.time-cell svg {
+  color: #64748b;
+}
+
+.worked-cell {
+  color: #dbeafe;
+}
+
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
+.attendance-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  width: fit-content;
+
+  padding: 6px 9px;
+
+  border-radius: 999px;
+
+  font-size: 10px;
+  font-weight: 750;
+
+  white-space: nowrap;
+}
+
+.attendance-status.finalized {
+  background: rgba(34, 197, 94, 0.10);
+  color: #4ade80;
+}
+
+.attendance-status.active {
+  background: rgba(59, 130, 246, 0.10);
+  color: #60a5fa;
+}
+
+.attendance-status.missed {
+  background: rgba(245, 158, 11, 0.10);
+  color: #fbbf24;
+}
+
+.attendance-status.review {
+  background: rgba(239, 68, 68, 0.10);
+  color: #f87171;
+}
+
+.attendance-status.unknown {
+  background: rgba(148, 163, 184, 0.10);
+  color: #94a3b8;
+}
+
+
+/* =========================================================
+   VIEW BUTTON
+   ========================================================= */
+
+.attendance-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 7px 10px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+
+  background: rgba(255, 255, 255, 0.025);
+
+  color: #93c5fd;
+
+  font-size: 11px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.attendance-view-btn:hover {
+  background: rgba(59, 130, 246, 0.08);
+
+  border-color:
+    rgba(59, 130, 246, 0.25);
+}
+
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+
+.attendance-modal-backdrop {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background:
+    rgba(0, 0, 0, 0.72);
+
+  backdrop-filter:
+    blur(8px);
+}
+
+.attendance-modal {
+  width: min(
+    900px,
+    100%
+  );
+
+  max-height: 88vh;
+
+  overflow-y: auto;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  border-radius: 18px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #10141c,
+      #090c12
+    );
+
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.55);
+}
+
+.attendance-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 23px 24px 18px;
+
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.07);
+}
+
+.attendance-modal-header h2 {
+  margin: 0;
+
+  color: #f4f7fb;
+
+  font-size: 22px;
+}
+
+.attendance-modal-close {
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.09);
+
+  border-radius: 9px;
+
+  background:
+    rgba(255, 255, 255, 0.035);
+
+  color: #94a3b8;
+
+  font-size: 23px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   DETAIL SUMMARY
+   ========================================================= */
+
+.attendance-detail-summary {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 1px;
+
+  margin: 18px 24px;
+
+  overflow: hidden;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.07);
+
+  border-radius: 12px;
+
+  background:
+    rgba(255, 255, 255, 0.07);
+}
+
+.attendance-detail-summary > div {
+  padding: 14px;
+
+  background:
+    rgba(8, 12, 18, 0.95);
+}
+
+.attendance-detail-summary span {
+  display: block;
+
+  margin-bottom: 6px;
+
+  color: #667085;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.attendance-detail-summary strong {
+  color: #e5e7eb;
+
+  font-size: 14px;
+}
+
+
+/* =========================================================
+   DETAIL SECTIONS
+   ========================================================= */
+
+.attendance-detail-section {
+  padding: 4px 24px 20px;
+}
+
+.detail-section-title {
+  margin-bottom: 12px;
+
+  color: #cbd5e1;
+
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.detail-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, 1fr);
+
+  gap: 10px;
+}
+
+.detail-grid > div {
+  padding: 13px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.07);
+
+  border-radius: 10px;
+
+  background:
+    rgba(255, 255, 255, 0.02);
+}
+
+.detail-grid span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #667085;
+
+  font-size: 10px;
+}
+
+.detail-grid strong {
+  color: #dce3ed;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   INTERVALS
+   ========================================================= */
+
+.attendance-intervals {
+  display: flex;
+  flex-direction: column;
+
+  gap: 12px;
+}
+
+.attendance-interval {
+  padding: 15px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.07);
+
+  border-radius: 12px;
+
+  background:
+    rgba(255, 255, 255, 0.018);
+}
+
+.interval-title {
+  margin-bottom: 12px;
+
+  color: #93c5fd;
+
+  font-size: 11px;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.interval-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, 1fr);
+
+  gap: 10px;
+}
+
+.punch-card {
+  padding: 13px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.06);
+
+  border-radius: 10px;
+
+  background:
+    rgba(3, 7, 18, 0.45);
+}
+
+.punch-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-bottom: 8px;
+
+  color: #7f8da2;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.punch-card strong {
+  display: block;
+
+  color: #e5e7eb;
+
+  font-size: 13px;
+}
+
+.punch-meta {
+  display: flex;
+  flex-direction: column;
+
+  gap: 5px;
+
+  margin-top: 10px;
+
+  color: #64748b;
+
+  font-size: 10px;
+}
+
+.punch-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.interval-worked {
+  margin-top: 10px;
+
+  color: #94a3b8;
+
+  font-size: 11px;
+}
+
+.attendance-no-punch {
+  padding: 16px;
+
+  border-radius: 10px;
+
+  background:
+    rgba(255, 255, 255, 0.025);
+
+  color: #64748b;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   MODAL FOOTER
+   ========================================================= */
+
+.attendance-detail-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 4px;
+  padding: 16px 24px;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.07);
+
+  color: #596579;
+
+  font-size: 10px;
+}
+
+.attendance-detail-footer code {
+  color: #8490a4;
+
+  word-break: break-all;
+}
+
+
+/* =========================================================
+   ANIMATION
+   ========================================================= */
+
+.spin {
+  animation:
+    my-attendance-spin
+    0.9s linear infinite;
+}
+
+@keyframes my-attendance-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+  .attendance-summary-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+
+}
+
+
+@media (max-width: 800px) {
+
+  .attendance-summary-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .attendance-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-filter-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .attendance-detail-summary {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .interval-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+
+@media (max-width: 520px) {
+
+  .attendance-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-summary-card {
+    min-height: 78px;
+  }
+
+  .attendance-filter-header,
+  .attendance-filters {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .attendance-detail-summary {
+    margin-left: 15px;
+    margin-right: 15px;
+  }
+
+  .attendance-detail-section {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .attendance-modal-backdrop {
+    padding: 10px;
+  }
+
+  .attendance-modal {
+    max-height: 94vh;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+}

@@ -22,6 +22,7 @@ import ProfilePending from "./pages/employee/ProfilePending";
 import Profile from "./pages/employee/Profile";
 import MyQr from "./pages/employee/MyQr";
 import MarkAttendance from "./pages/employee/MarkAttendance";
+import MyAttendance from "./pages/employee/MyAttendance";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Employees from "./pages/admin/Employees";
@@ -94,6 +95,13 @@ function App() {
               path="/attendance"
               element={
                 <Attendance />
+              }
+            />
+
+            <Route
+              path="/attendance/history"
+              element={
+                <MyAttendance />
               }
             />
 
