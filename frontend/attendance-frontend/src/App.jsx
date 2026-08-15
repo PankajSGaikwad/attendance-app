@@ -14,6 +14,9 @@ import AppShell from "./components/layout/AppShell";
 
 import Dashboard from "./pages/employee/Dashboard";
 import Attendance from "./pages/employee/Attendance";
+import CompleteProfile from "./pages/employee/CompleteProfile";
+import ProfilePending from "./pages/employee/ProfilePending";
+
 
 function App() {
   return (
@@ -21,7 +24,9 @@ function App() {
 
       <Routes>
 
-        {/* Public */}
+        {/* =========================================
+            PUBLIC
+            ========================================= */}
 
         <Route
           path="/login"
@@ -33,7 +38,10 @@ function App() {
           element={<Register />}
         />
 
-        {/* Protected */}
+
+        {/* =========================================
+            PROTECTED
+            ========================================= */}
 
         <Route
           element={<ProtectedRoute />}
@@ -53,11 +61,28 @@ function App() {
               element={<Attendance />}
             />
 
+            <Route
+              path="/complete-profile"
+              element={
+                <CompleteProfile />
+              }
+            />
+
+            <Route
+              path="/profile-pending"
+              element={
+                <ProfilePending />
+              }
+            />
+
           </Route>
 
         </Route>
 
-        {/* Default */}
+
+        {/* =========================================
+            DEFAULT
+            ========================================= */}
 
         <Route
           path="/"
@@ -68,6 +93,7 @@ function App() {
             />
           }
         />
+
 
         <Route
           path="*"
@@ -84,5 +110,6 @@ function App() {
     </AuthProvider>
   );
 }
+
 
 export default App;
