@@ -113,11 +113,11 @@ public class DepartmentServiceImpl implements DepartmentService {
     private DepartmentResponse toResponse(Department department){
         return new DepartmentResponse(
                 department.getId(),
-                department.getCode(),
                 department.getName(),
+                department.getCode(),
                 department.isActive(),
                 department.getCreatedAt(),
-                department.getCreatedAt()
+                department.getUpdatedAt()
         );
     }
 }

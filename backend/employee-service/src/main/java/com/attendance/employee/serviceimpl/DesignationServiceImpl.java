@@ -185,9 +185,9 @@ public class DesignationServiceImpl implements DesignationService {
     ){
         return new DesignationResponse(
                 designation.getId(),
-                designation.getDepartmentId(),
                 designation.getCode(),
                 designation.getName(),
+                designation.getDepartmentId(),
                 designation.isActive(),
                 designation.getCreatedAt(),
                 designation.getUpdatedAt()

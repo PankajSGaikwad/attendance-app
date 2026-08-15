@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   BarChart3,
   Building2,
   CalendarCheck2,
@@ -73,6 +74,11 @@ const adminLinks = [
     icon: Building2,
   },
   {
+    path: "/admin/designations",
+    label: "Designations",
+    icon: BadgeCheck,
+  },
+  {
     path: "/admin/shifts",
     label: "Shifts",
     icon: Clock3,
@@ -100,10 +106,9 @@ function NavigationItem({
       to={item.path}
       onClick={onClose}
       className={({ isActive }) =>
-        `nav-item ${
-          isActive
-            ? "active"
-            : ""
+        `nav-item ${isActive
+          ? "active"
+          : ""
         }`
       }
     >
@@ -144,11 +149,10 @@ export default function Sidebar({
 
 
       <aside
-        className={`sidebar ${
-          mobileOpen
+        className={`sidebar ${mobileOpen
             ? "open"
             : ""
-        }`}
+          }`}
       >
 
         {/* BRAND */}
