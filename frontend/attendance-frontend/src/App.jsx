@@ -19,6 +19,7 @@ import Dashboard from "./pages/employee/Dashboard";
 import Attendance from "./pages/employee/Attendance";
 import CompleteProfile from "./pages/employee/CompleteProfile";
 import ProfilePending from "./pages/employee/ProfilePending";
+import Profile from "./pages/employee/Profile";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Employees from "./pages/admin/Employees";
@@ -94,6 +95,12 @@ function App() {
               }
             />
 
+            <Route
+              path="/profile"
+              element={
+                <Profile />
+              }
+            />
 
             <Route
               path="/complete-profile"
