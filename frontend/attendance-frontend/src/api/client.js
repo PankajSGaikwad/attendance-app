@@ -2,9 +2,6 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "",
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 api.interceptors.request.use((config) => {
@@ -15,6 +12,15 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization =
       `Bearer ${token}`;
+  }
+
+  // Let the browser/Axios set the correct
+  // multipart boundary for FormData.
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  } else {
+    config.headers["Content-Type"] =
+      "application/json";
   }
 
   return config;

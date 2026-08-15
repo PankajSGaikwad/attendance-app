@@ -21,6 +21,7 @@ import CompleteProfile from "./pages/employee/CompleteProfile";
 import ProfilePending from "./pages/employee/ProfilePending";
 import Profile from "./pages/employee/Profile";
 import MyQr from "./pages/employee/MyQr";
+import MarkAttendance from "./pages/employee/MarkAttendance";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Employees from "./pages/admin/Employees";
@@ -125,6 +126,12 @@ function App() {
               }
             />
 
+            <Route
+              path="/mark-attendance"
+              element={
+                <MarkAttendance />
+              }
+            />
 
             {/* =====================================
                 ADMIN
