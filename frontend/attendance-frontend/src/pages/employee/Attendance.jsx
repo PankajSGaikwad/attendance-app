@@ -77,7 +77,7 @@ function Attendance() {
 
 
   /* =========================================================
-     PHOTO
+     PHOTO STATE
      ========================================================= */
 
   const [cameraRunning, setCameraRunning] =
@@ -148,9 +148,6 @@ function Attendance() {
   const photoStreamRef =
     useRef(null);
 
-  const canvasRef =
-    useRef(null);
-
 
   /* =========================================================
      ERROR MESSAGE
@@ -171,7 +168,54 @@ function Attendance() {
 
 
   /* =========================================================
-     STOP QR CAMERA
+     CAMERA ERROR
+     ========================================================= */
+
+  const getCameraErrorMessage = useCallback(
+    (err) => {
+      const name = err?.name;
+
+      if (name === "NotAllowedError") {
+        return (
+          "Camera permission was denied. Please allow camera access for localhost and try again."
+        );
+      }
+
+      if (name === "NotFoundError") {
+        return (
+          "No camera was found on this device."
+        );
+      }
+
+      if (name === "NotReadableError") {
+        return (
+          "The camera is already being used by another application or browser tab."
+        );
+      }
+
+      if (name === "OverconstrainedError") {
+        return (
+          "The selected camera does not support the requested settings."
+        );
+      }
+
+      if (name === "SecurityError") {
+        return (
+          "The browser blocked camera access for security reasons."
+        );
+      }
+
+      return (
+        err?.message ||
+        "Unable to access the camera. Please check camera permission and try again."
+      );
+    },
+    []
+  );
+
+
+  /* =========================================================
+     STOP QR SCANNER
      ========================================================= */
 
   const stopQrScanner = useCallback(() => {
@@ -188,22 +232,30 @@ function Attendance() {
 
     qrControlsRef.current = null;
 
-    try {
-      if (qrReaderRef.current) {
-        qrReaderRef.current.reset();
-      }
-    } catch (err) {
-      console.warn(
-        "Unable to reset QR reader:",
-        err
-      );
-    }
+    /*
+     * IMPORTANT:
+     *
+     * @zxing/browser reader does not always expose
+     * reset() in the browser implementation.
+     *
+     * Therefore DO NOT call:
+     *
+     * qrReaderRef.current.reset()
+     *
+     * This removes the console error you were seeing.
+     */
 
     qrReaderRef.current = null;
 
     if (qrVideoRef.current) {
       const video =
         qrVideoRef.current;
+
+      try {
+        video.pause();
+      } catch {
+        // ignore
+      }
 
       if (video.srcObject) {
         const stream =
@@ -216,13 +268,51 @@ function Attendance() {
           });
       }
 
-      video.pause();
-
       video.srcObject = null;
     }
 
     setScannerRunning(false);
     setScannerStarting(false);
+  }, []);
+
+
+  /* =========================================================
+     STOP PHOTO CAMERA
+     ========================================================= */
+
+  const stopPhotoCamera = useCallback(() => {
+    try {
+      if (photoStreamRef.current) {
+        photoStreamRef.current
+          .getTracks()
+          .forEach((track) => {
+            track.stop();
+          });
+      }
+    } catch (err) {
+      console.warn(
+        "Unable to stop photo camera:",
+        err
+      );
+    }
+
+    photoStreamRef.current = null;
+
+    if (photoVideoRef.current) {
+      const video =
+        photoVideoRef.current;
+
+      try {
+        video.pause();
+      } catch {
+        // ignore
+      }
+
+      video.srcObject = null;
+    }
+
+    setCameraRunning(false);
+    setCameraStarting(false);
   }, []);
 
 
@@ -255,60 +345,49 @@ function Attendance() {
           );
         }
 
-        /*
-         * Create a fresh QR reader.
-         */
+        const video =
+          qrVideoRef.current;
+
+        if (!video) {
+          throw new Error(
+            "QR camera element is not ready."
+          );
+        }
+
         const reader =
           new BrowserQRCodeReader();
 
-        qrReaderRef.current = reader;
+        qrReaderRef.current =
+          reader;
 
-        /*
-         * Use environment/rear camera where possible.
-         *
-         * IMPORTANT:
-         * We use "ideal", not "exact".
-         *
-         * "exact: environment" was one of
-         * the reasons your previous implementation
-         * could fail on Chrome/devices.
-         */
         const constraints = {
           audio: false,
+
           video: {
             facingMode: {
               ideal: "environment",
             },
+
             width: {
               ideal: 1280,
             },
+
             height: {
               ideal: 720,
             },
           },
         };
 
-        /*
-         * Start decoding directly from the video element.
-         */
         const controls =
           await reader.decodeFromConstraints(
             constraints,
-            qrVideoRef.current,
-            async (result, decodeError) => {
+            video,
+            async (result) => {
               if (!result) {
-                /*
-                 * Normal QR decode failures happen
-                 * continuously while scanning.
-                 *
-                 * Do not display them.
-                 */
                 return;
               }
 
-              if (
-                qrLockedRef.current
-              ) {
+              if (qrLockedRef.current) {
                 return;
               }
 
@@ -358,9 +437,7 @@ function Attendance() {
         stopQrScanner();
 
         setError(
-          getCameraErrorMessage(
-            err
-          )
+          getCameraErrorMessage(err)
         );
 
         setScannerStarting(false);
@@ -369,73 +446,13 @@ function Attendance() {
     [
       scannerStarting,
       stopQrScanner,
+      getCameraErrorMessage,
     ]
   );
 
 
   /* =========================================================
-     CAMERA ERROR MESSAGE
-     ========================================================= */
-
-  const getCameraErrorMessage =
-    (err) => {
-      const name =
-        err?.name;
-
-      if (
-        name ===
-        "NotAllowedError"
-      ) {
-        return (
-          "Camera permission was denied. Please click the camera icon in Chrome's address bar, allow Camera access for localhost, and try again."
-        );
-      }
-
-      if (
-        name ===
-        "NotFoundError"
-      ) {
-        return (
-          "No camera was found on this device."
-        );
-      }
-
-      if (
-        name ===
-        "NotReadableError"
-      ) {
-        return (
-          "The camera is already being used by another application or browser tab."
-        );
-      }
-
-      if (
-        name ===
-        "OverconstrainedError"
-      ) {
-        return (
-          "The selected camera does not support the requested settings. Please try again."
-        );
-      }
-
-      if (
-        name ===
-        "SecurityError"
-      ) {
-        return (
-          "The browser blocked camera access for security reasons."
-        );
-      }
-
-      return (
-        err?.message ||
-        "Unable to access the camera. Please check camera permission and try again."
-      );
-    };
-
-
-  /* =========================================================
-     SUBMIT QR TO BACKEND
+     SUBMIT QR
      ========================================================= */
 
   const handleQrSubmit =
@@ -478,8 +495,12 @@ function Attendance() {
         setAttempt(data);
 
         /*
-         * Backend controls the actual TTL.
+         * Backend controls TTL.
+         *
+         * Your backend response should normally
+         * contain expiresInSeconds.
          */
+
         const ttl =
           Number(
             data?.expiresInSeconds
@@ -495,29 +516,32 @@ function Attendance() {
         setMessage("");
 
         /*
-         * The backend may tell us whether
-         * photo/location are required.
-         *
-         * Normally your attendance flow is:
-         *
-         * QR -> Photo -> Location -> Complete
+         * PHOTO REQUIRED
          */
 
         if (
-          data?.photoRequired ===
-          false
+          data?.photoRequired === false
         ) {
+          /*
+           * PHOTO NOT REQUIRED
+           */
+
           if (
-            data?.locationRequired ===
-            false
+            data?.locationRequired === false
           ) {
             setStep(5);
           } else {
             setStep(4);
           }
-        } else {
-          setStep(3);
+
+          return;
         }
+
+        /*
+         * PHOTO REQUIRED
+         */
+
+        setStep(3);
       } catch (err) {
         console.error(
           "Attendance scan failed:",
@@ -532,14 +556,6 @@ function Attendance() {
 
         qrLockedRef.current =
           false;
-
-        /*
-         * Do NOT automatically restart
-         * the camera.
-         *
-         * Let the user click
-         * "Start QR Scanner".
-         */
       }
     };
 
@@ -556,9 +572,7 @@ function Attendance() {
       return;
     }
 
-    if (
-      remainingSeconds <= 0
-    ) {
+    if (remainingSeconds <= 0) {
       setError(
         "The attendance attempt has expired. Please scan the employee QR code again."
       );
@@ -570,6 +584,12 @@ function Attendance() {
       setQrValue("");
 
       setPhotoId("");
+
+      if (photoPreview) {
+        URL.revokeObjectURL(
+          photoPreview
+        );
+      }
 
       setPhotoPreview("");
 
@@ -607,6 +627,8 @@ function Attendance() {
   }, [
     attempt,
     remainingSeconds,
+    stopPhotoCamera,
+    photoPreview,
   ]);
 
 
@@ -615,138 +637,206 @@ function Attendance() {
      ========================================================= */
 
   const startPhotoCamera =
-    async () => {
-      if (cameraStarting) {
-        return;
-      }
-
-      setError("");
-      setMessage("");
-
-      setCameraStarting(true);
-
-      try {
-        stopPhotoCamera();
-
-        if (
-          !navigator.mediaDevices ||
-          !navigator.mediaDevices
-            .getUserMedia
-        ) {
-          throw new Error(
-            "Camera access is not supported by this browser."
-          );
+    useCallback(
+      async () => {
+        if (cameraStarting) {
+          return;
         }
 
-        /*
-         * Front/user-facing camera.
-         */
-        const stream =
-          await navigator.mediaDevices.getUserMedia(
-            {
-              audio: false,
+        setError("");
+        setMessage("");
 
-              video: {
-                facingMode: {
-                  ideal: "user",
-                },
+        setCameraStarting(true);
 
-                width: {
-                  ideal: 1280,
-                },
+        try {
+          stopPhotoCamera();
 
-                height: {
-                  ideal: 720,
+          if (
+            !navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia
+          ) {
+            throw new Error(
+              "Camera access is not supported by this browser."
+            );
+          }
+
+          const video =
+            photoVideoRef.current;
+
+          if (!video) {
+            throw new Error(
+              "Photo camera element is not ready."
+            );
+          }
+
+          /*
+           * Front camera.
+           */
+
+          const stream =
+            await navigator.mediaDevices.getUserMedia(
+              {
+                audio: false,
+
+                video: {
+                  facingMode: {
+                    ideal: "user",
+                  },
+
+                  width: {
+                    ideal: 1280,
+                  },
+
+                  height: {
+                    ideal: 720,
+                  },
                 },
-              },
+              }
+            );
+
+          photoStreamRef.current =
+            stream;
+
+          video.srcObject =
+            stream;
+
+          video.muted = true;
+
+          video.playsInline = true;
+
+          video.autoplay = true;
+
+          /*
+           * Wait until browser has loaded
+           * actual video metadata.
+           */
+
+          await new Promise(
+            (resolve) => {
+              if (
+                video.readyState >=
+                HTMLMediaElement.HAVE_METADATA
+              ) {
+                resolve();
+                return;
+              }
+
+              const handleLoadedMetadata =
+                () => {
+                  video.removeEventListener(
+                    "loadedmetadata",
+                    handleLoadedMetadata
+                  );
+
+                  resolve();
+                };
+
+              video.addEventListener(
+                "loadedmetadata",
+                handleLoadedMetadata
+              );
             }
           );
 
-        photoStreamRef.current =
-          stream;
+          await video.play();
 
-        const video =
-          photoVideoRef.current;
+          /*
+           * Wait until actual video dimensions
+           * are available.
+           */
 
-        if (!video) {
-          throw new Error(
-            "Photo camera element is not ready."
+          await new Promise(
+            (resolve) => {
+              const checkVideo =
+                () => {
+                  if (
+                    video.videoWidth > 0 &&
+                    video.videoHeight > 0
+                  ) {
+                    resolve();
+                    return;
+                  }
+
+                  window.requestAnimationFrame(
+                    checkVideo
+                  );
+                };
+
+              checkVideo();
+            }
           );
-        }
 
-        video.srcObject =
-          stream;
+          setCameraRunning(true);
 
-        video.muted = true;
+          setCameraStarting(false);
 
-        video.playsInline = true;
+          console.log(
+            "Photo camera ready:",
+            {
+              width:
+                video.videoWidth,
 
-        await video.play();
-
-        setCameraRunning(true);
-
-        setCameraStarting(false);
-      } catch (err) {
-        console.error(
-          "Photo camera error:",
-          err
-        );
-
-        stopPhotoCamera();
-
-        setError(
-          getCameraErrorMessage(
+              height:
+                video.videoHeight,
+            }
+          );
+        } catch (err) {
+          console.error(
+            "Photo camera error:",
             err
-          )
-        );
+          );
 
-        setCameraStarting(false);
-      }
-    };
+          stopPhotoCamera();
+
+          setError(
+            getCameraErrorMessage(err)
+          );
+
+          setCameraStarting(false);
+        }
+      },
+      [
+        cameraStarting,
+        stopPhotoCamera,
+        getCameraErrorMessage,
+      ]
+    );
 
 
   /* =========================================================
-     STOP PHOTO CAMERA
+     AUTO START PHOTO CAMERA
      ========================================================= */
 
-  const stopPhotoCamera =
-    () => {
-      try {
-        if (
-          photoStreamRef.current
-        ) {
-          photoStreamRef.current
-            .getTracks()
-            .forEach(
-              (track) => {
-                track.stop();
-              }
-            );
-        }
-      } catch (err) {
-        console.warn(
-          "Unable to stop photo camera:",
-          err
-        );
-      }
+  useEffect(() => {
+    if (
+      step !== 3 ||
+      photoPreview ||
+      cameraRunning ||
+      cameraStarting
+    ) {
+      return;
+    }
 
-      photoStreamRef.current =
-        null;
+    /*
+     * Give React one render cycle so
+     * photoVideoRef is attached to DOM.
+     */
 
-      if (
-        photoVideoRef.current
-      ) {
-        const video =
-          photoVideoRef.current;
+    const timer =
+      window.setTimeout(() => {
+        startPhotoCamera();
+      }, 150);
 
-        video.pause();
-
-        video.srcObject = null;
-      }
-
-      setCameraRunning(false);
-      setCameraStarting(false);
+    return () => {
+      window.clearTimeout(timer);
     };
+  }, [
+    step,
+    photoPreview,
+    cameraRunning,
+    cameraStarting,
+    startPhotoCamera,
+  ]);
 
 
   /* =========================================================
@@ -755,23 +845,32 @@ function Attendance() {
 
   const capturePhoto =
     async () => {
-      if (!cameraRunning) {
+      /*
+       * IMPORTANT:
+       *
+       * Do NOT use canvasRef here.
+       *
+       * We create a fresh canvas dynamically.
+       * This completely removes the previous
+       * "canvasRef.current is null" problem.
+       */
+
+      const video =
+        photoVideoRef.current;
+
+      if (!video) {
         setError(
-          "Please start the camera first."
+          "Photo camera element is not available."
         );
 
         return;
       }
 
-      const video =
-        photoVideoRef.current;
-
-      const canvas =
-        canvasRef.current;
-
-      if (!video || !canvas) {
+      if (
+        !photoStreamRef.current
+      ) {
         setError(
-          "Camera is not ready."
+          "Camera stream is not available. Please start the camera again."
         );
 
         return;
@@ -789,11 +888,11 @@ function Attendance() {
       }
 
       if (
-        video.videoWidth === 0 ||
-        video.videoHeight === 0
+        video.videoWidth <= 0 ||
+        video.videoHeight <= 0
       ) {
         setError(
-          "Camera image is not available yet. Please try again."
+          "Camera image is not available yet. Please wait a moment and try again."
         );
 
         return;
@@ -801,82 +900,140 @@ function Attendance() {
 
       setError("");
 
-      canvas.width =
-        video.videoWidth;
-
-      canvas.height =
-        video.videoHeight;
-
-      const context =
-        canvas.getContext(
-          "2d"
-        );
-
-      if (!context) {
-        setError(
-          "Unable to prepare photo capture."
-        );
-
-        return;
-      }
-
-      /*
-       * Since the preview is mirrored,
-       * mirror the captured image as well.
-       */
-      context.save();
-
-      context.translate(
-        canvas.width,
-        0
+      setMessage(
+        "Capturing photo..."
       );
 
-      context.scale(-1, 1);
+      try {
+        /*
+         * Create canvas dynamically.
+         */
 
-      context.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      context.restore();
-
-      canvas.toBlob(
-        async (blob) => {
-          if (!blob) {
-            setError(
-              "Unable to create photo."
-            );
-
-            return;
-          }
-
-          const previewUrl =
-            URL.createObjectURL(
-              blob
-            );
-
-          if (photoPreview) {
-            URL.revokeObjectURL(
-              photoPreview
-            );
-          }
-
-          setPhotoPreview(
-            previewUrl
+        const canvas =
+          document.createElement(
+            "canvas"
           );
 
-          stopPhotoCamera();
+        canvas.width =
+          video.videoWidth;
 
-          await uploadPhoto(
+        canvas.height =
+          video.videoHeight;
+
+        const context =
+          canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error(
+            "Unable to prepare photo capture."
+          );
+        }
+
+        /*
+         * Mirror the captured image
+         * because front camera preview
+         * is mirrored.
+         */
+
+        context.save();
+
+        context.translate(
+          canvas.width,
+          0
+        );
+
+        context.scale(
+          -1,
+          1
+        );
+
+        context.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        context.restore();
+
+        /*
+         * Convert canvas to JPEG.
+         */
+
+        const blob =
+          await new Promise(
+            (resolve) => {
+              canvas.toBlob(
+                resolve,
+                "image/jpeg",
+                0.9
+              );
+            }
+          );
+
+        if (!blob) {
+          throw new Error(
+            "Unable to create photo."
+          );
+        }
+
+        console.log(
+          "Photo captured:",
+          {
+            size: blob.size,
+            type: blob.type,
+            width:
+              canvas.width,
+            height:
+              canvas.height,
+          }
+        );
+
+        /*
+         * Create preview.
+         */
+
+        const previewUrl =
+          URL.createObjectURL(
             blob
           );
-        },
-        "image/jpeg",
-        0.9
-      );
+
+        if (photoPreview) {
+          URL.revokeObjectURL(
+            photoPreview
+          );
+        }
+
+        setPhotoPreview(
+          previewUrl
+        );
+
+        /*
+         * Stop camera AFTER capture.
+         */
+
+        stopPhotoCamera();
+
+        /*
+         * Upload photo.
+         */
+
+        await uploadPhoto(
+          blob
+        );
+      } catch (err) {
+        console.error(
+          "Photo capture failed:",
+          err
+        );
+
+        setMessage("");
+
+        setError(
+          getErrorMessage(err)
+        );
+      }
     };
 
 
@@ -943,13 +1100,12 @@ function Attendance() {
         );
 
         /*
-         * IMPORTANT:
+         * Do NOT manually set Content-Type.
          *
-         * Do not manually set Content-Type.
-         *
-         * Axios/browser will add the correct
-         * multipart boundary automatically.
+         * Browser/Axios will add multipart
+         * boundary automatically.
          */
+
         const response =
           await api.post(
             "/api/media/employee/attendance-photo",
@@ -988,9 +1144,9 @@ function Attendance() {
         );
 
         /*
-         * If location is not required,
-         * go directly to completion.
+         * Continue to location.
          */
+
         if (
           attempt.locationRequired ===
           false
@@ -1023,7 +1179,7 @@ function Attendance() {
      ========================================================= */
 
   const retakePhoto =
-    () => {
+    async () => {
       if (photoPreview) {
         URL.revokeObjectURL(
           photoPreview
@@ -1038,7 +1194,10 @@ function Attendance() {
 
       setError("");
 
-      startPhotoCamera();
+      /*
+       * Camera automatically starts
+       * because step remains 3.
+       */
     };
 
 
@@ -1060,9 +1219,7 @@ function Attendance() {
         return;
       }
 
-      setLocationLoading(
-        true
-      );
+      setLocationLoading(true);
 
       setMessage(
         "Getting your current location..."
@@ -1118,22 +1275,19 @@ function Attendance() {
           setMessage("");
 
           if (
-            err.code ===
-            1
+            err.code === 1
           ) {
             setError(
               "Location permission was denied. Please allow location access for localhost and try again."
             );
           } else if (
-            err.code ===
-            2
+            err.code === 2
           ) {
             setError(
               "Your current location could not be determined. Please try again."
             );
           } else if (
-            err.code ===
-            3
+            err.code === 3
           ) {
             setError(
               "Location request timed out. Please try again."
@@ -1215,17 +1369,11 @@ function Attendance() {
             new Date().toISOString(),
         };
 
-        /*
-         * Add photo only when we have one.
-         */
         if (photoId) {
           payload.photoId =
             photoId;
         }
 
-        /*
-         * Add location only when available.
-         */
         if (location) {
           payload.latitude =
             location.latitude;
@@ -1279,7 +1427,7 @@ function Attendance() {
      ========================================================= */
 
   const resetFlow =
-    async () => {
+    () => {
       stopQrScanner();
 
       stopPhotoCamera();
@@ -1320,6 +1468,18 @@ function Attendance() {
       setCameraRunning(
         false
       );
+
+      setUploadingPhoto(
+        false
+      );
+
+      setLocationLoading(
+        false
+      );
+
+      setCompleting(
+        false
+      );
     };
 
 
@@ -1332,15 +1492,10 @@ function Attendance() {
       stopQrScanner();
 
       stopPhotoCamera();
-
-      if (photoPreview) {
-        URL.revokeObjectURL(
-          photoPreview
-        );
-      }
     };
   }, [
     stopQrScanner,
+    stopPhotoCamera,
   ]);
 
 
@@ -1353,18 +1508,22 @@ function Attendance() {
       number: 1,
       label: "Scan QR",
     },
+
     {
       number: 2,
       label: "Verify",
     },
+
     {
       number: 3,
       label: "Photo",
     },
+
     {
       number: 4,
       label: "Location",
     },
+
     {
       number: 5,
       label: "Complete",
@@ -1373,7 +1532,7 @@ function Attendance() {
 
 
   /* =========================================================
-     FLOW STEP STATUS
+     STEP CLASS
      ========================================================= */
 
   const getStepClass =
@@ -1417,11 +1576,14 @@ function Attendance() {
         {steps.map(
           (item) => (
             <div
-              key={item.number}
+              key={
+                item.number
+              }
               className={`attendance-flow-step ${getStepClass(
                 item.number
               )}`}
             >
+
               <div className="attendance-flow-number">
                 {item.number}
               </div>
@@ -1429,6 +1591,7 @@ function Attendance() {
               <span>
                 {item.label}
               </span>
+
             </div>
           )
         )}
@@ -1453,12 +1616,11 @@ function Attendance() {
             <div className="attendance-card-header">
 
               <div className="attendance-icon blue">
-                <QrCode
-                  size={24}
-                />
+                <QrCode size={24} />
               </div>
 
               <div>
+
                 <div className="attendance-eyebrow">
                   STEP 1
                 </div>
@@ -1470,31 +1632,28 @@ function Attendance() {
                 <p>
                   Position the employee QR code inside the scanning frame.
                 </p>
+
               </div>
 
             </div>
 
 
-            {/* QR CAMERA */}
-
             <div className="qr-scanner-wrapper">
 
               <video
-                ref={
-                  qrVideoRef
-                }
+                ref={qrVideoRef}
                 className="attendance-qr-video"
                 muted
                 playsInline
+                autoPlay
               />
+
 
               {!scannerRunning &&
                 !scannerStarting && (
                   <div className="scanner-empty">
 
-                    <QrCode
-                      size={52}
-                    />
+                    <QrCode size={52} />
 
                     <strong>
                       Camera is ready
@@ -1511,9 +1670,7 @@ function Attendance() {
               {scannerStarting && (
                 <div className="scanner-loading">
 
-                  <ScanLine
-                    size={42}
-                  />
+                  <ScanLine size={42} />
 
                   <strong>
                     Starting camera...
@@ -1531,8 +1688,11 @@ function Attendance() {
                 <div className="qr-frame">
 
                   <div className="qr-corner top-left" />
+
                   <div className="qr-corner top-right" />
+
                   <div className="qr-corner bottom-left" />
+
                   <div className="qr-corner bottom-right" />
 
                   <div className="qr-scan-line" />
@@ -1543,14 +1703,10 @@ function Attendance() {
             </div>
 
 
-            {/* QR STATUS */}
-
             {scannerRunning && (
               <div className="attendance-info">
 
-                <ScanLine
-                  size={16}
-                />
+                <ScanLine size={16} />
 
                 <span>
                   Scanning for employee QR...
@@ -1559,8 +1715,6 @@ function Attendance() {
               </div>
             )}
 
-
-            {/* BUTTONS */}
 
             <div className="attendance-actions">
 
@@ -1573,11 +1727,11 @@ function Attendance() {
                       startQrScanner
                     }
                   >
-                    <Play
-                      size={17}
-                    />
+
+                    <Play size={17} />
 
                     Start QR Scanner
+
                   </button>
                 )}
 
@@ -1601,18 +1755,16 @@ function Attendance() {
                     stopQrScanner
                   }
                 >
-                  <Square
-                    size={16}
-                  />
+
+                  <Square size={16} />
 
                   Stop Scanner
+
                 </button>
               )}
 
             </div>
 
-
-            {/* OPTIONAL TEST INPUT */}
 
             <details className="attendance-test">
 
@@ -1631,8 +1783,7 @@ function Attendance() {
                   value={qrValue}
                   onChange={(event) =>
                     setQrValue(
-                      event.target
-                        .value
+                      event.target.value
                     )
                   }
                   placeholder="Paste QR value only for testing"
@@ -1671,12 +1822,11 @@ function Attendance() {
             <div className="attendance-card-header">
 
               <div className="attendance-icon purple">
-                <Camera
-                  size={24}
-                />
+                <Camera size={24} />
               </div>
 
               <div>
+
                 <div className="attendance-eyebrow">
                   STEP 3
                 </div>
@@ -1688,6 +1838,7 @@ function Attendance() {
                 <p>
                   Take a live photo to verify that you are the employee marking attendance.
                 </p>
+
               </div>
 
             </div>
@@ -1695,20 +1846,16 @@ function Attendance() {
 
             {/* COUNTDOWN */}
 
-            {remainingSeconds !==
-              null && (
+            {remainingSeconds !== null && (
               <div
                 className={`attendance-countdown ${
-                  remainingSeconds <=
-                  15
+                  remainingSeconds <= 15
                     ? "danger"
                     : ""
                 }`}
               >
 
-                <Clock3
-                  size={16}
-                />
+                <Clock3 size={16} />
 
                 <span>
                   Attendance attempt expires in{" "}
@@ -1726,33 +1873,48 @@ function Attendance() {
             <div className="attendance-camera">
 
               <video
-                ref={
-                  photoVideoRef
-                }
+                ref={photoVideoRef}
                 className="attendance-camera-video"
                 muted
                 playsInline
+                autoPlay
               />
 
 
               {!cameraRunning &&
+                !cameraStarting &&
                 !photoPreview && (
                   <div className="camera-overlay">
 
-                    <UserRound
-                      size={48}
-                    />
+                    <UserRound size={48} />
 
                     <strong>
                       Camera is not running
                     </strong>
 
                     <span>
-                      Start the camera to capture your photo.
+                      Starting camera...
                     </span>
 
                   </div>
                 )}
+
+
+              {cameraStarting && (
+                <div className="camera-overlay">
+
+                  <Camera size={48} />
+
+                  <strong>
+                    Starting camera...
+                  </strong>
+
+                  <span>
+                    Please allow camera access.
+                  </span>
+
+                </div>
+              )}
 
 
               {cameraRunning && (
@@ -1776,9 +1938,7 @@ function Attendance() {
               <div className="attendance-photo-preview">
 
                 <img
-                  src={
-                    photoPreview
-                  }
+                  src={photoPreview}
                   alt="Attendance preview"
                 />
 
@@ -1786,14 +1946,12 @@ function Attendance() {
             )}
 
 
-            {/* PHOTO STATUS */}
+            {/* UPLOAD */}
 
             {uploadingPhoto && (
               <div className="attendance-info">
 
-                <Upload
-                  size={16}
-                />
+                <Upload size={16} />
 
                 <span>
                   Uploading photo...
@@ -1807,40 +1965,26 @@ function Attendance() {
 
             <div className="attendance-actions">
 
-              {!cameraRunning &&
-                !photoPreview &&
-                !uploadingPhoto && (
-                  <button
-                    type="button"
-                    className="attendance-btn primary"
-                    onClick={
-                      startPhotoCamera
-                    }
-                  >
-                    <Camera
-                      size={17}
-                    />
-
-                    Start Camera
-                  </button>
-                )}
-
-
               {cameraRunning && (
                 <>
+
                   <button
                     type="button"
                     className="attendance-btn secondary"
                     onClick={
                       stopPhotoCamera
                     }
+                    disabled={
+                      uploadingPhoto
+                    }
                   >
-                    <Square
-                      size={16}
-                    />
+
+                    <Square size={16} />
 
                     Stop Camera
+
                   </button>
+
 
                   <button
                     type="button"
@@ -1848,34 +1992,38 @@ function Attendance() {
                     onClick={
                       capturePhoto
                     }
+                    disabled={
+                      uploadingPhoto
+                    }
                   >
-                    <Camera
-                      size={17}
-                    />
 
-                    Capture Photo
+                    <Camera size={17} />
+
+                    {uploadingPhoto
+                      ? "Uploading..."
+                      : "Capture Photo"}
+
                   </button>
+
                 </>
               )}
 
 
               {photoPreview &&
                 !uploadingPhoto && (
-                  <>
-                    <button
-                      type="button"
-                      className="attendance-btn secondary"
-                      onClick={
-                        retakePhoto
-                      }
-                    >
-                      <RotateCcw
-                        size={16}
-                      />
+                  <button
+                    type="button"
+                    className="attendance-btn secondary"
+                    onClick={
+                      retakePhoto
+                    }
+                  >
 
-                      Retake
-                    </button>
-                  </>
+                    <RotateCcw size={16} />
+
+                    Retake
+
+                  </button>
                 )}
 
             </div>
@@ -1883,9 +2031,7 @@ function Attendance() {
 
             <div className="attendance-help">
 
-              <ShieldCheck
-                size={15}
-              />
+              <ShieldCheck size={15} />
 
               <span>
                 Your photo is captured directly from your device camera.
@@ -1907,12 +2053,11 @@ function Attendance() {
             <div className="attendance-card-header">
 
               <div className="attendance-icon green">
-                <MapPin
-                  size={24}
-                />
+                <MapPin size={24} />
               </div>
 
               <div>
+
                 <div className="attendance-eyebrow">
                   STEP 4
                 </div>
@@ -1924,25 +2069,22 @@ function Attendance() {
                 <p>
                   Allow location access so the attendance service can verify where attendance was marked.
                 </p>
+
               </div>
 
             </div>
 
 
-            {remainingSeconds !==
-              null && (
+            {remainingSeconds !== null && (
               <div
                 className={`attendance-countdown ${
-                  remainingSeconds <=
-                  15
+                  remainingSeconds <= 15
                     ? "danger"
                     : ""
                 }`}
               >
 
-                <Clock3
-                  size={16}
-                />
+                <Clock3 size={16} />
 
                 <span>
                   Attendance attempt expires in{" "}
@@ -1959,9 +2101,7 @@ function Attendance() {
 
               <div className="location-icon">
 
-                <Crosshair
-                  size={42}
-                />
+                <Crosshair size={42} />
 
               </div>
 
@@ -1979,9 +2119,7 @@ function Attendance() {
             {location && (
               <div className="attendance-location">
 
-                <MapPin
-                  size={22}
-                />
+                <MapPin size={22} />
 
                 <div>
 
@@ -2016,9 +2154,7 @@ function Attendance() {
                 }
               >
 
-                <MapPin
-                  size={17}
-                />
+                <MapPin size={17} />
 
                 {locationLoading
                   ? "Getting location..."
@@ -2042,12 +2178,11 @@ function Attendance() {
             <div className="attendance-card-header">
 
               <div className="attendance-icon blue">
-                <ShieldCheck
-                  size={24}
-                />
+                <ShieldCheck size={24} />
               </div>
 
               <div>
+
                 <div className="attendance-eyebrow">
                   STEP 5
                 </div>
@@ -2059,25 +2194,22 @@ function Attendance() {
                 <p>
                   All required verification information has been collected.
                 </p>
+
               </div>
 
             </div>
 
 
-            {remainingSeconds !==
-              null && (
+            {remainingSeconds !== null && (
               <div
                 className={`attendance-countdown ${
-                  remainingSeconds <=
-                  15
+                  remainingSeconds <= 15
                     ? "danger"
                     : ""
                 }`}
               >
 
-                <Clock3
-                  size={16}
-                />
+                <Clock3 size={16} />
 
                 <span>
                   Attendance attempt expires in{" "}
@@ -2095,9 +2227,9 @@ function Attendance() {
               <div className="review-item">
 
                 <div className="review-icon green">
-                  <QrCode
-                    size={18}
-                  />
+
+                  <QrCode size={18} />
+
                 </div>
 
                 <div>
@@ -2124,9 +2256,9 @@ function Attendance() {
                 <div className="review-item">
 
                   <div className="review-icon purple">
-                    <Camera
-                      size={18}
-                    />
+
+                    <Camera size={18} />
+
                   </div>
 
                   <div>
@@ -2154,9 +2286,9 @@ function Attendance() {
                 <div className="review-item">
 
                   <div className="review-icon green">
-                    <MapPin
-                      size={18}
-                    />
+
+                    <MapPin size={18} />
+
                   </div>
 
                   <div>
@@ -2186,9 +2318,7 @@ function Attendance() {
               <div className="attendance-photo-preview small">
 
                 <img
-                  src={
-                    photoPreview
-                  }
+                  src={photoPreview}
                   alt="Captured attendance"
                 />
 
@@ -2208,12 +2338,13 @@ function Attendance() {
                   completing
                 }
               >
-                <RotateCcw
-                  size={16}
-                />
+
+                <RotateCcw size={16} />
 
                 Start Again
+
               </button>
+
 
               <button
                 type="button"
@@ -2226,9 +2357,7 @@ function Attendance() {
                 }
               >
 
-                <CheckCircle2
-                  size={17}
-                />
+                <CheckCircle2 size={17} />
 
                 {completing
                   ? "Completing..."
@@ -2251,9 +2380,7 @@ function Attendance() {
 
             <div className="attendance-success-icon">
 
-              <CheckCircle2
-                size={42}
-              />
+              <CheckCircle2 size={42} />
 
             </div>
 
@@ -2274,9 +2401,7 @@ function Attendance() {
 
               <div>
 
-                <CheckCircle2
-                  size={18}
-                />
+                <CheckCircle2 size={18} />
 
                 <span>
                   QR verified
@@ -2288,9 +2413,7 @@ function Attendance() {
               {photoId && (
                 <div>
 
-                  <CheckCircle2
-                    size={18}
-                  />
+                  <CheckCircle2 size={18} />
 
                   <span>
                     Photo verified
@@ -2303,9 +2426,7 @@ function Attendance() {
               {location && (
                 <div>
 
-                  <CheckCircle2
-                    size={18}
-                  />
+                  <CheckCircle2 size={18} />
 
                   <span>
                     Location verified
@@ -2325,9 +2446,7 @@ function Attendance() {
               }
             >
 
-              <RotateCcw
-                size={17}
-              />
+              <RotateCcw size={17} />
 
               Mark Another Attendance
 
@@ -2344,9 +2463,7 @@ function Attendance() {
         {message && (
           <div className="attendance-info">
 
-            <CheckCircle2
-              size={16}
-            />
+            <CheckCircle2 size={16} />
 
             <span>
               {message}
@@ -2359,9 +2476,7 @@ function Attendance() {
         {error && (
           <div className="attendance-error">
 
-            <XCircle
-              size={17}
-            />
+            <XCircle size={17} />
 
             <span>
               {error}
