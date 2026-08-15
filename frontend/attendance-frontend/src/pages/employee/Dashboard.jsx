@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
-  Activity,
   ArrowRight,
   CalendarCheck2,
+  CalendarDays,
+  CheckCircle2,
   Clock3,
+  Coffee,
+  RefreshCw,
   Timer,
   TrendingUp,
+  UserRound,
+  XCircle,
 } from "lucide-react";
 
 import PageHeader from "../../components/common/PageHeader";
@@ -14,14 +21,33 @@ import StatCard from "../../components/common/StatCard";
 import { getMyProfile } from "../../api/employeeApi";
 import { getMyAttendance } from "../../api/attendanceApi";
 
+import "./dashboard.css";
+
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 
 function formatMinutes(minutes = 0) {
-  const totalMinutes = Number(minutes) || 0;
+  const total = Number(minutes) || 0;
 
-  const hours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
 
-  return `${hours}h ${remainingMinutes}m`;
+  if (hours === 0) {
+    return `${mins}m`;
+  }
+
+  return `${hours}h ${mins}m`;
 }
 
 
@@ -30,54 +56,80 @@ function formatDate(dateString) {
     return "-";
   }
 
-  try {
-    return new Date(
-      `${dateString}T00:00:00`
-    ).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-    });
-  } catch {
+  const date = new Date(`${dateString}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
     return dateString;
   }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 
-function formatTime(timeString) {
-  if (!timeString) {
+function formatLongDate(dateString) {
+  if (!dateString) {
+    return "-";
+  }
+
+  const date = new Date(`${dateString}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+
+function formatTime(time) {
+  if (!time) {
     return "--:--";
   }
 
-  return timeString;
+  return String(time).substring(0, 5);
+}
+
+
+function normalizeStatus(status) {
+  if (!status) {
+    return "NOT MARKED";
+  }
+
+  return String(status)
+    .replaceAll("_", " ")
+    .toUpperCase();
 }
 
 
 function getStatusClass(status) {
-  if (!status) {
-    return "pending";
-  }
-
-  const normalized =
-    String(status).toLowerCase();
+  const value = String(status || "").toLowerCase();
 
   if (
-    normalized.includes("present") ||
-    normalized.includes("completed") ||
-    normalized.includes("approved")
+    value.includes("present") ||
+    value.includes("complete") ||
+    value.includes("approved")
   ) {
     return "present";
   }
 
   if (
-    normalized.includes("late") ||
-    normalized.includes("partial")
+    value.includes("late") ||
+    value.includes("partial")
   ) {
     return "late";
   }
 
   if (
-    normalized.includes("absent") ||
-    normalized.includes("rejected")
+    value.includes("absent") ||
+    value.includes("rejected")
   ) {
     return "absent";
   }
@@ -86,146 +138,224 @@ function getStatusClass(status) {
 }
 
 
-function Dashboard() {
-  const [profile, setProfile] =
-    useState(null);
+function getStatusIcon(status) {
+  const className = getStatusClass(status);
 
-  const [attendance, setAttendance] =
-    useState([]);
+  if (className === "present") {
+    return <CheckCircle2 size={16} />;
+  }
 
-  const [loading, setLoading] =
-    useState(true);
+  if (className === "absent") {
+    return <XCircle size={16} />;
+  }
 
-  const [error, setError] =
-    useState("");
+  return <Clock3 size={16} />;
+}
 
 
-  /*
-   * Load employee dashboard data
-   */
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+
+export default function Dashboard() {
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState(null);
+  const [attendance, setAttendance] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+
+  /* =======================================================
+     LOAD DASHBOARD DATA
+     ======================================================= */
+
+  const loadDashboard = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError("");
+
+      const [
+        profileResponse,
+        attendanceResponse,
+      ] = await Promise.all([
+        getMyProfile(),
+        getMyAttendance(),
+      ]);
+
+      setProfile(profileResponse?.data || null);
+
+      const records = Array.isArray(
+        attendanceResponse?.data
+      )
+        ? attendanceResponse.data
+        : [];
+
+      setAttendance(records);
+
+    } catch (err) {
+      console.error(
+        "Dashboard loading failed:",
+        err
+      );
+
+      setError(
+        err?.response?.data?.message ||
+          "Unable to load dashboard data."
+      );
+
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
 
   useEffect(() => {
-    let mounted = true;
-
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const [
-          profileResponse,
-          attendanceResponse,
-        ] = await Promise.all([
-          getMyProfile(),
-          getMyAttendance(),
-        ]);
-
-        if (!mounted) {
-          return;
-        }
-
-        setProfile(
-          profileResponse.data
-        );
-
-        setAttendance(
-          Array.isArray(
-            attendanceResponse.data
-          )
-            ? attendanceResponse.data
-            : []
-        );
-
-      } catch (err) {
-        console.error(
-          "Dashboard loading failed:",
-          err
-        );
-
-        if (mounted) {
-          setError(
-            err.response?.data?.message ||
-              "Unable to load dashboard data."
-          );
-        }
-
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     loadDashboard();
-
-    return () => {
-      mounted = false;
-    };
-
   }, []);
 
 
-  /*
-   * Find today's attendance
-   */
+  /* =======================================================
+     TODAY
+     ======================================================= */
 
-  const todayAttendance =
-    useMemo(() => {
-      const today =
-        new Date()
-          .toISOString()
-          .split("T")[0];
+  const today = getLocalDateString();
 
-      return attendance.find(
-        (record) =>
-          record.attendanceDate === today
-      );
-
-    }, [attendance]);
+  const todayAttendance = useMemo(() => {
+    return attendance.find(
+      (record) =>
+        record?.attendanceDate === today
+    );
+  }, [attendance, today]);
 
 
-  /*
-   * Recent attendance
-   */
+  /* =======================================================
+     SORTED ATTENDANCE
+     ======================================================= */
 
-  const recentAttendance =
-    useMemo(() => {
-      return [...attendance]
-        .sort((a, b) =>
-          String(
-            b.attendanceDate || ""
-          ).localeCompare(
-            String(
-              a.attendanceDate || ""
-            )
-          )
+  const sortedAttendance = useMemo(() => {
+    return [...attendance].sort((a, b) =>
+      String(
+        b?.attendanceDate || ""
+      ).localeCompare(
+        String(
+          a?.attendanceDate || ""
         )
-        .slice(0, 5);
+      )
+    );
+  }, [attendance]);
 
-    }, [attendance]);
+
+  /* =======================================================
+     RECENT ATTENDANCE
+     ======================================================= */
+
+  const recentAttendance = useMemo(() => {
+    return sortedAttendance.slice(0, 7);
+  }, [sortedAttendance]);
 
 
-  /*
-   * Dashboard values
-   */
+  /* =======================================================
+     ATTENDANCE STATISTICS
+     ======================================================= */
 
-  const employeeName =
-    profile?.firstName ||
-    "there";
+  const attendanceStatistics = useMemo(() => {
+    if (attendance.length === 0) {
+      return {
+        total: 0,
+        present: 0,
+        late: 0,
+        absent: 0,
+        percentage: 0,
+        workedMinutes: 0,
+        breakMinutes: 0,
+      };
+    }
 
-  const employeeEmail =
-    profile?.email ||
-    "Employee";
+    let present = 0;
+    let late = 0;
+    let absent = 0;
+    let workedMinutes = 0;
+    let breakMinutes = 0;
+
+    attendance.forEach((record) => {
+      const status = String(
+        record?.status || ""
+      ).toLowerCase();
+
+      if (
+        status.includes("absent")
+      ) {
+        absent++;
+      } else if (
+        status.includes("late")
+      ) {
+        late++;
+        present++;
+      } else if (
+        status.includes("present") ||
+        status.includes("complete") ||
+        status.includes("approved")
+      ) {
+        present++;
+      }
+
+      workedMinutes +=
+        Number(
+          record?.workedMinutes
+        ) || 0;
+
+      breakMinutes +=
+        Number(
+          record?.breakMinutes
+        ) || 0;
+    });
+
+    const percentage =
+      attendance.length > 0
+        ? Math.round(
+            (present / attendance.length) *
+              100
+          )
+        : 0;
+
+    return {
+      total: attendance.length,
+      present,
+      late,
+      absent,
+      percentage,
+      workedMinutes,
+      breakMinutes,
+    };
+  }, [attendance]);
+
+
+  /* =======================================================
+     TODAY VALUES
+     ======================================================= */
 
   const todayStatus =
     todayAttendance?.status ||
     "NOT MARKED";
 
-  const workedToday =
-    formatMinutes(
-      todayAttendance?.workedMinutes ||
-        0
-    );
+  const todayWorkedMinutes =
+    Number(
+      todayAttendance?.workedMinutes
+    ) || 0;
+
+  const todayBreakMinutes =
+    Number(
+      todayAttendance?.breakMinutes
+    ) || 0;
 
   const shiftName =
     todayAttendance?.shiftName ||
@@ -240,87 +370,208 @@ function Dashboard() {
     "--:--";
 
 
-  /*
-   * Loading state
-   */
+  /* =======================================================
+     EMPLOYEE DETAILS
+     ======================================================= */
+
+  const firstName =
+    profile?.firstName ||
+    profile?.name ||
+    "Employee";
+
+  const fullName = [
+    profile?.firstName,
+    profile?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ") || firstName;
+
+  const employeeCode =
+    profile?.employeeCode ||
+    "Not assigned";
+
+  const department =
+    profile?.departmentName ||
+    "Not assigned";
+
+  const designation =
+    profile?.designationName ||
+    "Not assigned";
+
+  const email =
+    profile?.email ||
+    "Not available";
+
+
+  /* =======================================================
+     LOADING
+     ======================================================= */
 
   if (loading) {
     return (
       <div className="dashboard-loading">
+        <div className="dashboard-spinner" />
 
-        <div className="loading-spinner" />
+        <h3>
+          Loading dashboard
+        </h3>
 
         <p>
-          Loading your attendance
-          dashboard...
+          Fetching your attendance information...
         </p>
-
       </div>
     );
   }
 
 
-  return (
-    <div>
+  /* =======================================================
+     RENDER
+     ======================================================= */
 
-      {/* =====================================================
-          PAGE HEADER
-          ===================================================== */}
+  return (
+    <div className="employee-dashboard">
+
+      {/* =================================================
+          HEADER
+          ================================================= */}
 
       <PageHeader
         eyebrow="EMPLOYEE WORKSPACE"
-        title={`Good morning, ${employeeName}.`}
-        description="Here's your attendance overview for today."
+        title={`Good morning, ${firstName}.`}
+        description={
+          todayAttendance
+            ? `Here's your attendance overview for ${formatLongDate(today)}.`
+            : `Here's your attendance overview for today.`
+        }
         action={
-          <button
-            className="primary-btn"
-            onClick={() =>
-              window.location.href =
-                "/attendance"
-            }
-          >
-            <CalendarCheck2 size={17} />
+          <div className="dashboard-header-actions">
 
-            Mark attendance
-          </button>
+            <button
+              className="dashboard-refresh-btn"
+              onClick={() =>
+                loadDashboard(true)
+              }
+              disabled={refreshing}
+              title="Refresh dashboard"
+            >
+              <RefreshCw
+                size={17}
+                className={
+                  refreshing
+                    ? "spin"
+                    : ""
+                }
+              />
+            </button>
+
+            <button
+              className="primary-btn"
+              onClick={() =>
+                navigate("/attendance")
+              }
+            >
+              <CalendarCheck2
+                size={17}
+              />
+
+              Mark attendance
+            </button>
+
+          </div>
         }
       />
 
 
-      {/* =====================================================
-          ERROR MESSAGE
-          ===================================================== */}
+      {/* =================================================
+          ERROR
+          ================================================= */}
 
       {error && (
         <div className="dashboard-error">
 
-          <strong>
-            Unable to load some data
-          </strong>
+          <div>
+            <strong>
+              Unable to load dashboard data
+            </strong>
 
-          <span>
-            {error}
-          </span>
+            <span>
+              {error}
+            </span>
+          </div>
+
+          <button
+            onClick={() =>
+              loadDashboard(true)
+            }
+          >
+            Retry
+          </button>
 
         </div>
       )}
 
 
-      {/* =====================================================
-          STAT CARDS
-          ===================================================== */}
+      {/* =================================================
+          TODAY SUMMARY
+          ================================================= */}
 
-      <div className="stats-grid">
+      <div className="dashboard-welcome-card">
+
+        <div className="welcome-left">
+
+          <div className="welcome-icon">
+            <CalendarDays size={24} />
+          </div>
+
+          <div>
+            <span className="welcome-label">
+              TODAY
+            </span>
+
+            <h2>
+              {formatLongDate(today)}
+            </h2>
+
+            <p>
+              {todayAttendance
+                ? "Your attendance has been recorded."
+                : "You have not marked attendance today."}
+            </p>
+          </div>
+
+        </div>
+
+
+        <div
+          className={`today-status-pill ${getStatusClass(
+            todayStatus
+          )}`}
+        >
+          {getStatusIcon(todayStatus)}
+
+          {normalizeStatus(todayStatus)}
+        </div>
+
+      </div>
+
+
+      {/* =================================================
+          KPI CARDS
+          ================================================= */}
+
+      <div className="stats-grid dashboard-stats">
 
         <StatCard
           label="Today's status"
-          value={todayStatus}
+          value={normalizeStatus(
+            todayStatus
+          )}
           hint={
             todayAttendance
               ? todayAttendance.late
                 ? "Late check-in"
                 : "Attendance recorded"
-              : "No attendance recorded yet"
+              : "Attendance not marked"
           }
           icon={CalendarCheck2}
         />
@@ -328,7 +579,9 @@ function Dashboard() {
 
         <StatCard
           label="Today's shift"
-          value={`${shiftStart}–${shiftEnd}`}
+          value={`${formatTime(
+            shiftStart
+          )} – ${formatTime(shiftEnd)}`}
           hint={shiftName}
           icon={Clock3}
           tone="violet"
@@ -337,14 +590,15 @@ function Dashboard() {
 
         <StatCard
           label="Worked today"
-          value={workedToday}
+          value={formatMinutes(
+            todayWorkedMinutes
+          )}
           hint={
             todayAttendance
               ? `${formatMinutes(
-                  todayAttendance.breakMinutes ||
-                    0
+                  todayBreakMinutes
                 )} break`
-              : "No working time recorded"
+              : "No working time"
           }
           icon={Timer}
           tone="cyan"
@@ -352,13 +606,9 @@ function Dashboard() {
 
 
         <StatCard
-          label="Attendance records"
-          value={attendance.length}
-          hint={
-            profile?.employeeCode
-              ? `Employee ${profile.employeeCode}`
-              : "Total records"
-          }
+          label="Attendance rate"
+          value={`${attendanceStatistics.percentage}%`}
+          hint={`${attendanceStatistics.present} present records`}
           icon={TrendingUp}
           tone="green"
         />
@@ -366,40 +616,33 @@ function Dashboard() {
       </div>
 
 
-      {/* =====================================================
-          MAIN DASHBOARD
-          ===================================================== */}
+      {/* =================================================
+          MAIN GRID
+          ================================================= */}
 
-      <div className="dashboard-grid">
+      <div className="dashboard-main-grid">
 
+        {/* ===============================================
+            TODAY ATTENDANCE
+            =============================================== */}
 
-        {/* ===================================================
-            TODAY'S ATTENDANCE
-            =================================================== */}
+        <section className="dashboard-panel">
 
-        <section className="panel">
-
-          <div className="panel-title">
+          <div className="dashboard-panel-header">
 
             <div>
-
-              <div className="eyebrow">
+              <span className="dashboard-eyebrow">
                 TODAY
-              </div>
+              </span>
 
               <h2>
                 Attendance overview
               </h2>
-
             </div>
 
-
-            <span className="live-pill">
-
+            <span className="dashboard-live-pill">
               <i />
-
               Live
-
             </span>
 
           </div>
@@ -407,30 +650,27 @@ function Dashboard() {
 
           {!todayAttendance ? (
 
-            <div className="empty-dashboard-state">
+            <div className="dashboard-empty">
 
-              <div className="empty-state-icon">
-
+              <div className="dashboard-empty-icon">
                 <CalendarCheck2
-                  size={22}
+                  size={24}
                 />
-
               </div>
 
-              <strong>
+              <h3>
                 Attendance not marked
-              </strong>
+              </h3>
 
-              <span>
+              <p>
                 You haven't recorded
                 attendance for today.
-              </span>
+              </p>
 
               <button
                 className="secondary-btn"
                 onClick={() =>
-                  window.location.href =
-                    "/attendance"
+                  navigate("/attendance")
                 }
               >
                 Mark attendance
@@ -444,19 +684,19 @@ function Dashboard() {
 
           ) : (
 
-            <div className="timeline">
+            <div className="attendance-timeline">
 
-              <div className="timeline-line" />
+              {/* RECORD */}
 
+              <div className="timeline-item">
 
-              {/* CHECK IN */}
+                <div className="timeline-marker done">
+                  <CheckCircle2
+                    size={15}
+                  />
+                </div>
 
-              <div className="timeline-row">
-
-                <div className="timeline-dot done" />
-
-                <div>
-
+                <div className="timeline-content">
                   <strong>
                     Attendance recorded
                   </strong>
@@ -466,13 +706,52 @@ function Dashboard() {
                       ? "Late attendance"
                       : "Attendance recorded successfully"}
                   </span>
+                </div>
 
+                <time>
+                  {todayAttendance.createdAt
+                    ? new Date(
+                        todayAttendance.createdAt
+                      ).toLocaleTimeString(
+                        "en-IN",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )
+                    : "--:--"}
+                </time>
+
+              </div>
+
+
+              {/* SHIFT */}
+
+              <div className="timeline-item">
+
+                <div className="timeline-marker done">
+                  <Clock3
+                    size={15}
+                  />
+                </div>
+
+                <div className="timeline-content">
+                  <strong>
+                    Scheduled shift
+                  </strong>
+
+                  <span>
+                    {shiftName}
+                  </span>
                 </div>
 
                 <time>
                   {formatTime(
-                    todayAttendance
-                      .scheduledStartTime
+                    shiftStart
+                  )}{" "}
+                  –{" "}
+                  {formatTime(
+                    shiftEnd
                   )}
                 </time>
 
@@ -481,29 +760,29 @@ function Dashboard() {
 
               {/* WORKED */}
 
-              <div className="timeline-row">
+              <div className="timeline-item">
 
-                <div className="timeline-dot done" />
+                <div className="timeline-marker done">
+                  <Timer
+                    size={15}
+                  />
+                </div>
 
-                <div>
-
+                <div className="timeline-content">
                   <strong>
                     Working time
                   </strong>
 
                   <span>
                     {formatMinutes(
-                      todayAttendance
-                        .workedMinutes || 0
+                      todayWorkedMinutes
                     )}
                   </span>
-
                 </div>
 
                 <time>
                   {formatMinutes(
-                    todayAttendance
-                      .breakMinutes || 0
+                    todayBreakMinutes
                   )}{" "}
                   break
                 </time>
@@ -513,20 +792,24 @@ function Dashboard() {
 
               {/* STATUS */}
 
-              <div className="timeline-row">
+              <div className="timeline-item">
 
-                <div className="timeline-dot done" />
+                <div className="timeline-marker done">
+                  {getStatusIcon(
+                    todayStatus
+                  )}
+                </div>
 
-                <div>
-
+                <div className="timeline-content">
                   <strong>
-                    Status
+                    Attendance status
                   </strong>
 
                   <span>
-                    {todayAttendance.status}
+                    {normalizeStatus(
+                      todayStatus
+                    )}
                   </span>
-
                 </div>
 
                 <time>
@@ -538,90 +821,137 @@ function Dashboard() {
               </div>
 
 
-              {/* CHECK OUT */}
+              {/* FINALIZED */}
 
-              <div className="timeline-row">
+              <div className="timeline-item">
 
-                <div className="timeline-dot next" />
+                <div
+                  className={`timeline-marker ${
+                    todayAttendance.finalizedAt
+                      ? "done"
+                      : "next"
+                  }`}
+                >
+                  {todayAttendance.finalizedAt ? (
+                    <CheckCircle2
+                      size={15}
+                    />
+                  ) : (
+                    <Clock3
+                      size={15}
+                    />
+                  )}
+                </div>
 
-                <div>
-
+                <div className="timeline-content">
                   <strong>
-                    Scheduled end
+                    Attendance finalization
                   </strong>
 
                   <span>
-                    {todayAttendance
-                      .scheduledEndTime ||
-                      "Not available"}
+                    {todayAttendance.finalizedAt
+                      ? "Attendance finalized"
+                      : "Attendance pending finalization"}
                   </span>
-
                 </div>
 
                 <time>
-                  {todayAttendance
-                    .finalizedAt
-                    ? "Finalized"
+                  {todayAttendance.finalizedAt
+                    ? "Completed"
                     : "Pending"}
                 </time>
 
               </div>
 
             </div>
-
           )}
 
         </section>
 
 
-        {/* ===================================================
+        {/* ===============================================
             SHIFT CARD
-            =================================================== */}
+            =============================================== */}
 
-        <section className="panel shift-card">
+        <section className="dashboard-panel dashboard-shift-panel">
 
-          <div className="eyebrow">
+          <span className="dashboard-eyebrow">
             YOUR SHIFT
-          </div>
+          </span>
 
           <h2>
             {shiftName}
           </h2>
 
-
-          <div className="shift-time">
-
-            {shiftStart}
+          <div className="dashboard-shift-time">
 
             <span>
+              {formatTime(shiftStart)}
+            </span>
+
+            <span className="shift-arrow">
               →
             </span>
 
-            {shiftEnd}
+            <span>
+              {formatTime(shiftEnd)}
+            </span>
 
           </div>
 
 
-          <div className="shift-meta">
+          <div className="shift-details">
 
-            <span>
+            <div>
+              <span>
+                WORKED
+              </span>
 
-              {todayAttendance?.overnight
-                ? "Overnight shift"
-                : "Today's schedule"}
+              <strong>
+                {formatMinutes(
+                  todayWorkedMinutes
+                )}
+              </strong>
+            </div>
 
-            </span>
 
-            <span>
+            <div>
+              <span>
+                BREAK
+              </span>
 
-              {todayAttendance
-                ? formatMinutes(
-                    todayAttendance
-                      .workedMinutes || 0
-                  )
-                : "0h 0m"}
+              <strong>
+                {formatMinutes(
+                  todayBreakMinutes
+                )}
+              </strong>
+            </div>
 
-            </span>
+          </div>
+
+
+          <div className="shift-info">
+
+            <div>
+              <Clock3 size={17} />
+
+              <span>
+                {todayAttendance?.overnight
+                  ? "Overnight shift"
+                  : "Today's schedule"}
+              </span>
+            </div>
+
+
+            <div>
+              <CalendarCheck2 size={17} />
+
+              <span>
+                {todayAttendance
+                  ? "Attendance recorded"
+                  : "Attendance pending"}
+              </span>
+            </div>
 
           </div>
 
@@ -629,17 +959,16 @@ function Dashboard() {
           <button
             className="secondary-btn full"
             onClick={() =>
-              window.location.href =
-                "/attendance"
+              navigate(
+                "/attendance/history"
+              )
             }
           >
-
             View attendance
 
             <ArrowRight
               size={16}
             />
-
           </button>
 
         </section>
@@ -647,41 +976,188 @@ function Dashboard() {
       </div>
 
 
-      {/* =====================================================
-          RECENT ATTENDANCE
-          ===================================================== */}
+      {/* =================================================
+          ATTENDANCE ANALYTICS
+          ================================================= */}
 
-      <section className="panel table-panel">
+      <section className="dashboard-panel dashboard-analytics">
 
-        <div className="panel-title">
+        <div className="dashboard-panel-header">
 
           <div>
-
-            <div className="eyebrow">
-              RECENT
-            </div>
+            <span className="dashboard-eyebrow">
+              PERFORMANCE
+            </span>
 
             <h2>
-              Attendance history
+              Attendance performance
             </h2>
-
           </div>
-
 
           <button
             className="text-btn"
             onClick={() =>
-              window.location.href =
-                "/attendance"
+              navigate(
+                "/attendance/history"
+              )
             }
           >
-
             View all
+            <ArrowRight size={15} />
+          </button>
 
-            <ArrowRight
-              size={15}
-            />
+        </div>
 
+
+        <div className="analytics-grid">
+
+          <div className="analytics-summary">
+
+            <div className="analytics-circle">
+
+              <div>
+                <strong>
+                  {attendanceStatistics.percentage}%
+                </strong>
+
+                <span>
+                  Attendance
+                </span>
+              </div>
+
+            </div>
+
+
+            <div className="analytics-stats">
+
+              <div>
+                <span>Present</span>
+                <strong>
+                  {attendanceStatistics.present}
+                </strong>
+              </div>
+
+              <div>
+                <span>Late</span>
+                <strong>
+                  {attendanceStatistics.late}
+                </strong>
+              </div>
+
+              <div>
+                <span>Absent</span>
+                <strong>
+                  {attendanceStatistics.absent}
+                </strong>
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div className="attendance-bars">
+
+            <div className="bars-title">
+              Last 7 attendance records
+            </div>
+
+            {recentAttendance.length === 0 ? (
+
+              <div className="analytics-empty">
+                No attendance records available.
+              </div>
+
+            ) : (
+
+              recentAttendance.map(
+                (record) => {
+
+                  const statusClass =
+                    getStatusClass(
+                      record?.status
+                    );
+
+                  return (
+                    <div
+                      className="attendance-bar-row"
+                      key={
+                        record?.id ||
+                        record?.attendanceDate
+                      }
+                    >
+
+                      <span className="bar-date">
+                        {formatDate(
+                          record?.attendanceDate
+                        )}
+                      </span>
+
+                      <div className="bar-track">
+
+                        <div
+                          className={`bar-fill ${statusClass}`}
+                          style={{
+                            width:
+                              statusClass ===
+                              "absent"
+                                ? "20%"
+                                : "100%",
+                          }}
+                        />
+
+                      </div>
+
+                      <span
+                        className={`bar-status ${statusClass}`}
+                      >
+                        {normalizeStatus(
+                          record?.status
+                        )}
+                      </span>
+
+                    </div>
+                  );
+                }
+              )
+
+            )}
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {/* =================================================
+          RECENT ATTENDANCE TABLE
+          ================================================= */}
+
+      <section className="dashboard-panel dashboard-table-panel">
+
+        <div className="dashboard-panel-header">
+
+          <div>
+            <span className="dashboard-eyebrow">
+              RECENT
+            </span>
+
+            <h2>
+              Recent attendance
+            </h2>
+          </div>
+
+          <button
+            className="text-btn"
+            onClick={() =>
+              navigate(
+                "/attendance/history"
+              )
+            }
+          >
+            View all
+            <ArrowRight size={15} />
           </button>
 
         </div>
@@ -689,53 +1165,31 @@ function Dashboard() {
 
         {recentAttendance.length === 0 ? (
 
-          <div className="empty-table-state">
+          <div className="dashboard-empty-table">
 
-            <Activity size={20} />
+            <CalendarDays size={22} />
 
             <span>
-              No attendance records
-              found.
+              No attendance records found.
             </span>
 
           </div>
 
         ) : (
 
-          <div className="table-wrap">
+          <div className="dashboard-table-wrap">
 
             <table>
 
               <thead>
-
                 <tr>
-
-                  <th>
-                    Date
-                  </th>
-
-                  <th>
-                    Shift
-                  </th>
-
-                  <th>
-                    Scheduled
-                  </th>
-
-                  <th>
-                    Worked
-                  </th>
-
-                  <th>
-                    Break
-                  </th>
-
-                  <th>
-                    Status
-                  </th>
-
+                  <th>Date</th>
+                  <th>Shift</th>
+                  <th>Scheduled</th>
+                  <th>Worked</th>
+                  <th>Break</th>
+                  <th>Status</th>
                 </tr>
-
               </thead>
 
 
@@ -746,74 +1200,65 @@ function Dashboard() {
 
                     <tr
                       key={
-                        record.id ||
-                        record.attendanceDate
+                        record?.id ||
+                        record?.attendanceDate
                       }
                     >
 
                       <td>
-                        {formatDate(
-                          record.attendanceDate
-                        )}
+                        <strong>
+                          {formatDate(
+                            record?.attendanceDate
+                          )}
+                        </strong>
                       </td>
 
-
                       <td>
-                        {record.shiftName ||
+                        {record?.shiftName ||
                           "-"}
                       </td>
 
-
                       <td>
-
                         {formatTime(
-                          record.scheduledStartTime
-                        )}
-
-                        {" – "}
-
+                          record?.scheduledStartTime
+                        )}{" "}
+                        –{" "}
                         {formatTime(
-                          record.scheduledEndTime
+                          record?.scheduledEndTime
                         )}
-
                       </td>
-
 
                       <td>
                         {formatMinutes(
-                          record.workedMinutes ||
-                            0
+                          record?.workedMinutes
                         )}
                       </td>
-
 
                       <td>
                         {formatMinutes(
-                          record.breakMinutes ||
-                            0
+                          record?.breakMinutes
                         )}
                       </td>
-
 
                       <td>
 
                         <span
-                          className={
-                            `badge ${getStatusClass(
-                              record.status
-                            )}`
-                          }
+                          className={`dashboard-status-badge ${getStatusClass(
+                            record?.status
+                          )}`}
                         >
+                          {getStatusIcon(
+                            record?.status
+                          )}
 
-                          {record.status ||
-                            "PENDING"}
-
+                          {normalizeStatus(
+                            record?.status
+                          )}
                         </span>
 
                       </td>
 
                     </tr>
-
                   )
                 )}
 
@@ -822,91 +1267,121 @@ function Dashboard() {
             </table>
 
           </div>
-
         )}
 
       </section>
 
 
-      {/* =====================================================
+      {/* =================================================
           EMPLOYEE INFORMATION
-          ===================================================== */}
+          ================================================= */}
 
-      <section className="dashboard-profile-strip">
+      <section className="dashboard-profile-card">
 
-        <div>
+        <div className="profile-card-icon">
+          <UserRound size={22} />
+        </div>
 
+
+        <div className="profile-card-item">
           <span>
             EMPLOYEE
           </span>
 
           <strong>
-            {employeeName}{" "}
-            {profile?.lastName || ""}
+            {fullName}
           </strong>
-
         </div>
 
 
-        <div>
-
+        <div className="profile-card-item">
           <span>
             EMPLOYEE CODE
           </span>
 
           <strong>
-            {profile?.employeeCode ||
-              "Not assigned"}
+            {employeeCode}
           </strong>
-
         </div>
 
 
-        <div>
-
+        <div className="profile-card-item">
           <span>
             DEPARTMENT
           </span>
 
           <strong>
-            {profile?.departmentName ||
-              "Not assigned"}
+            {department}
           </strong>
-
         </div>
 
 
-        <div>
-
+        <div className="profile-card-item">
           <span>
             DESIGNATION
           </span>
 
           <strong>
-            {profile?.designationName ||
-              "Not assigned"}
+            {designation}
           </strong>
-
         </div>
 
 
-        <div>
-
+        <div className="profile-card-item">
           <span>
             EMAIL
           </span>
 
           <strong>
-            {employeeEmail}
+            {email}
           </strong>
-
         </div>
 
       </section>
 
+
+      {/* =================================================
+          FOOTER ACTIONS
+          ================================================= */}
+
+      <div className="dashboard-footer-actions">
+
+        <button
+          className="secondary-btn"
+          onClick={() =>
+            navigate("/profile")
+          }
+        >
+          <UserRound size={16} />
+          View profile
+        </button>
+
+
+        <button
+          className="secondary-btn"
+          onClick={() =>
+            navigate(
+              "/attendance/history"
+            )
+          }
+        >
+          <CalendarDays size={16} />
+          Attendance history
+        </button>
+
+
+        <button
+          className="primary-btn"
+          onClick={() =>
+            navigate("/attendance")
+          }
+        >
+          <CalendarCheck2 size={16} />
+          Mark attendance
+        </button>
+
+      </div>
+
     </div>
   );
 }
-
-
-export default Dashboard;
