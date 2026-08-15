@@ -27,6 +27,8 @@ import AdminAttendance from "./pages/admin/Attendance";
 import Users from "./pages/admin/Users";
 import Departments from "./pages/admin/Departments";
 import Designations from "./pages/admin/Designations";
+import Shifts from "./pages/admin/Shifts";
+import ShiftAssignments from "./pages/admin/ShiftAssignments";
 
 
 function App() {
@@ -163,6 +165,20 @@ function App() {
               path="/admin/designations"
               element={
                 <Designations />
+              }
+            />
+
+            <Route
+              path="/admin/shifts"
+              element={
+                <Shifts />
+              }
+            />
+
+            <Route
+              path="/admin/shift-assignments"
+              element={
+                <ShiftAssignments />
               }
             />
 

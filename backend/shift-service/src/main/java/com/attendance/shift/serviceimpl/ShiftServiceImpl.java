@@ -149,7 +149,7 @@ public class ShiftServiceImpl implements ShiftService {
         shift.setActive(active);
         shift.setUpdatedBy(updatedBy);
         shift.setUpdatedAt(Instant.now());
-        return null;
+        return shiftMapper.toResponse(shift);
     }
 
     private ShiftTemplate findShift(String shiftId){
