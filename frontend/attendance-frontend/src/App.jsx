@@ -20,6 +20,7 @@ import Attendance from "./pages/employee/Attendance";
 import CompleteProfile from "./pages/employee/CompleteProfile";
 import ProfilePending from "./pages/employee/ProfilePending";
 import Profile from "./pages/employee/Profile";
+import MyQr from "./pages/employee/MyQr";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Employees from "./pages/admin/Employees";
@@ -114,6 +115,13 @@ function App() {
               path="/profile-pending"
               element={
                 <ProfilePending />
+              }
+            />
+
+            <Route
+              path="/my-qr"
+              element={
+                <MyQr />
               }
             />
 
