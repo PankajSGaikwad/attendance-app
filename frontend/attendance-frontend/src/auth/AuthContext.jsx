@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import * as authApi from "../api/authApi";
+
 import {
   getMyProfile,
 } from "../api/employeeApi";
@@ -21,6 +22,7 @@ const AuthContext =
  */
 
 function getStoredEmployee() {
+
   try {
 
     const employee =
@@ -33,16 +35,18 @@ function getStoredEmployee() {
       : null;
 
   } catch {
+
     return null;
   }
 }
 
 
 /*
- * Read stored auth user.
+ * Read stored authenticated user.
  */
 
 function getStoredUser() {
+
   try {
 
     const user =
@@ -55,8 +59,46 @@ function getStoredUser() {
       : null;
 
   } catch {
+
     return null;
   }
+}
+
+
+/*
+ * Normalize roles.
+
+ * Backend may return:
+ *
+ * ADMIN
+ * SUPERVISOR
+ * EMPLOYEE
+ *
+ * We also handle:
+ *
+ * ROLE_ADMIN
+ * ROLE_SUPERVISOR
+ * ROLE_EMPLOYEE
+ */
+
+function normalizeRoles(
+  roles
+) {
+
+  if (!Array.isArray(roles)) {
+
+    return [];
+  }
+
+  return roles.map(
+    (role) =>
+      String(role)
+        .replace(
+          "ROLE_",
+          ""
+        )
+        .toUpperCase()
+  );
 }
 
 
@@ -65,10 +107,16 @@ export function AuthProvider({
 }) {
 
   const [user, setUser] =
-    useState(getStoredUser);
+    useState(
+      getStoredUser
+    );
+
 
   const [employee, setEmployee] =
-    useState(getStoredEmployee);
+    useState(
+      getStoredEmployee
+    );
+
 
   const [accessToken, setAccessToken] =
     useState(
@@ -77,208 +125,193 @@ export function AuthProvider({
       )
     );
 
+
   const [loading, setLoading] =
     useState(true);
 
 
   /*
-   * Employee status is kept
-   * separately from auth status.
-   *
-   * Possible values:
-   *
-   * null
-   * DRAFT
-   * PENDING
-   * APPROVED
-   * REJECTED
-   * SUSPENDED
+   * User roles.
+   */
+
+  const roles =
+    normalizeRoles(
+      user?.roles
+    );
+
+
+  const isAdmin =
+    roles.includes(
+      "ADMIN"
+    );
+
+
+  const isSupervisor =
+    roles.includes(
+      "SUPERVISOR"
+    );
+
+
+  const isManagementUser =
+    isAdmin ||
+    isSupervisor;
+
+
+  /*
+   * Employee status.
    */
 
   const employeeStatus =
-    employee?.status || null;
+    employee?.status ||
+    null;
 
 
   /*
    * Save authentication.
    */
 
-  const saveAuthentication = (
-    data
-  ) => {
+  const saveAuthentication =
+    (data) => {
 
-    localStorage.setItem(
-      "attendance.accessToken",
-      data.accessToken
-    );
+      localStorage.setItem(
+        "attendance.accessToken",
+        data.accessToken
+      );
 
-    localStorage.setItem(
-      "attendance.refreshToken",
-      data.refreshToken
-    );
 
-    localStorage.setItem(
-      "attendance.user",
-      JSON.stringify(
+      localStorage.setItem(
+        "attendance.refreshToken",
+        data.refreshToken
+      );
+
+
+      localStorage.setItem(
+        "attendance.user",
+        JSON.stringify(
+          data.response
+        )
+      );
+
+
+      setAccessToken(
+        data.accessToken
+      );
+
+
+      setUser(
         data.response
-      )
-    );
-
-    setAccessToken(
-      data.accessToken
-    );
-
-    setUser(
-      data.response
-    );
-  };
+      );
+    };
 
 
   /*
    * Save employee profile.
    */
 
-  const saveEmployee = (
-    employeeData
-  ) => {
+  const saveEmployee =
+    (employeeData) => {
 
-    if (!employeeData) {
+      if (!employeeData) {
 
-      localStorage.removeItem(
-        "attendance.employee"
+        localStorage.removeItem(
+          "attendance.employee"
+        );
+
+        setEmployee(
+          null
+        );
+
+        return;
+      }
+
+
+      localStorage.setItem(
+        "attendance.employee",
+        JSON.stringify(
+          employeeData
+        )
       );
 
-      setEmployee(null);
 
-      return;
-    }
-
-    localStorage.setItem(
-      "attendance.employee",
-      JSON.stringify(
+      setEmployee(
         employeeData
-      )
-    );
-
-    setEmployee(
-      employeeData
-    );
-  };
+      );
+    };
 
 
   /*
    * Clear authentication.
    */
 
-  const clearAuthentication = () => {
+  const clearAuthentication =
+    () => {
 
-    localStorage.removeItem(
-      "attendance.accessToken"
-    );
-
-    localStorage.removeItem(
-      "attendance.refreshToken"
-    );
-
-    localStorage.removeItem(
-      "attendance.user"
-    );
-
-    localStorage.removeItem(
-      "attendance.employee"
-    );
-
-    setAccessToken(null);
-
-    setUser(null);
-
-    setEmployee(null);
-  };
-
-
-  /*
-   * Login.
-   */
-
-  const login = async (
-    email,
-    password
-  ) => {
-
-    const { data } =
-      await authApi.login({
-        email,
-        password,
-      });
-
-    saveAuthentication(data);
-
-    /*
-     * Try to load the employee
-     * profile immediately after
-     * authentication.
-     *
-     * A 404 is expected for a new
-     * auth-only account.
-     */
-
-    try {
-
-      const employeeResponse =
-        await getMyProfile();
-
-      saveEmployee(
-        employeeResponse.data
+      localStorage.removeItem(
+        "attendance.accessToken"
       );
 
-    } catch (error) {
+      localStorage.removeItem(
+        "attendance.refreshToken"
+      );
 
-      if (
-        error.response?.status ===
-        404
-      ) {
+      localStorage.removeItem(
+        "attendance.user"
+      );
 
-        saveEmployee(null);
+      localStorage.removeItem(
+        "attendance.employee"
+      );
 
-      } else {
 
-        console.error(
-          "Unable to load employee profile:",
-          error
-        );
+      setAccessToken(
+        null
+      );
 
-        /*
-         * Don't fail login just
-         * because employee profile
-         * lookup failed.
-         *
-         * ProtectedRoute will handle
-         * the authenticated state.
-         */
+      setUser(
+        null
+      );
 
-        saveEmployee(null);
-      }
-    }
-
-    return data;
-  };
+      setEmployee(
+        null
+      );
+    };
 
 
   /*
-   * Refresh employee profile.
+   * Load employee profile.
+   *
+   * IMPORTANT:
+   *
+   * Admins and supervisors
+   * do not need an employee
+   * profile.
    */
 
-  const refreshEmployeeProfile =
+  const loadEmployeeProfile =
     async () => {
+
+      if (
+        isManagementUser
+      ) {
+
+        saveEmployee(
+          null
+        );
+
+        return null;
+      }
+
 
       try {
 
         const response =
           await getMyProfile();
 
+
         saveEmployee(
           response.data
         );
+
 
         return response.data;
 
@@ -289,10 +322,176 @@ export function AuthProvider({
           404
         ) {
 
-          saveEmployee(null);
+          saveEmployee(
+            null
+          );
 
           return null;
         }
+
+
+        console.error(
+          "Unable to load employee profile:",
+          error
+        );
+
+
+        saveEmployee(
+          null
+        );
+
+
+        return null;
+      }
+    };
+
+
+  /*
+   * Login.
+   */
+
+  const login =
+    async (
+      email,
+      password
+    ) => {
+
+      const {
+        data,
+      } =
+        await authApi.login({
+          email,
+          password,
+        });
+
+
+      saveAuthentication(
+        data
+      );
+
+
+      /*
+       * Determine role directly
+       * from login response.
+       */
+
+      const loginRoles =
+        normalizeRoles(
+          data.response?.roles
+        );
+
+
+      const loginIsManagement =
+        loginRoles.includes(
+          "ADMIN"
+        ) ||
+        loginRoles.includes(
+          "SUPERVISOR"
+        );
+
+
+      /*
+       * Only employees need
+       * employee profile lookup.
+       */
+
+      if (
+        !loginIsManagement
+      ) {
+
+        try {
+
+          const employeeResponse =
+            await getMyProfile();
+
+
+          saveEmployee(
+            employeeResponse.data
+          );
+
+        } catch (error) {
+
+          if (
+            error.response?.status ===
+            404
+          ) {
+
+            saveEmployee(
+              null
+            );
+
+          } else {
+
+            console.error(
+              "Unable to load employee profile:",
+              error
+            );
+
+            saveEmployee(
+              null
+            );
+          }
+        }
+
+      } else {
+
+        saveEmployee(
+          null
+        );
+      }
+
+
+      return data;
+    };
+
+
+  /*
+   * Refresh employee profile.
+   */
+
+  const refreshEmployeeProfile =
+    async () => {
+
+      /*
+       * Management users don't
+       * have employee profiles.
+       */
+
+      if (
+        isManagementUser
+      ) {
+
+        return null;
+      }
+
+
+      try {
+
+        const response =
+          await getMyProfile();
+
+
+        saveEmployee(
+          response.data
+        );
+
+
+        return response.data;
+
+      } catch (error) {
+
+        if (
+          error.response?.status ===
+          404
+        ) {
+
+          saveEmployee(
+            null
+          );
+
+          return null;
+        }
+
 
         throw error;
       }
@@ -303,39 +502,43 @@ export function AuthProvider({
    * Logout.
    */
 
-  const logout = async () => {
+  const logout =
+    async () => {
 
-    const refreshToken =
-      localStorage.getItem(
-        "attendance.refreshToken"
-      );
-
-    try {
-
-      if (refreshToken) {
-
-        await authApi.logout(
-          refreshToken
+      const refreshToken =
+        localStorage.getItem(
+          "attendance.refreshToken"
         );
+
+
+      try {
+
+        if (
+          refreshToken
+        ) {
+
+          await authApi.logout(
+            refreshToken
+          );
+        }
+
+      } catch (error) {
+
+        console.error(
+          "Logout API error:",
+          error
+        );
+
+      } finally {
+
+        clearAuthentication();
       }
-
-    } catch (error) {
-
-      console.error(
-        "Logout API error:",
-        error
-      );
-
-    } finally {
-
-      clearAuthentication();
-    }
-  };
+    };
 
 
   /*
    * Restore authentication
-   * when the browser refreshes.
+   * after browser refresh.
    */
 
   useEffect(() => {
@@ -343,9 +546,13 @@ export function AuthProvider({
     const restoreSession =
       async () => {
 
-        if (!accessToken) {
+        if (
+          !accessToken
+        ) {
 
-          setLoading(false);
+          setLoading(
+            false
+          );
 
           return;
         }
@@ -354,52 +561,99 @@ export function AuthProvider({
         try {
 
           /*
-           * Verify the auth token.
+           * Verify authentication.
            */
 
           const {
             data,
-          } = await authApi.me();
+          } =
+            await authApi.me();
 
-          setUser(data);
+
+          setUser(
+            data
+          );
+
 
           localStorage.setItem(
             "attendance.user",
-            JSON.stringify(data)
+            JSON.stringify(
+              data
+            )
           );
 
 
           /*
-           * Then check employee
-           * profile.
+           * Determine roles from
+           * authenticated user.
            */
 
-          try {
-
-            const employeeResponse =
-              await getMyProfile();
-
-            saveEmployee(
-              employeeResponse.data
+          const restoredRoles =
+            normalizeRoles(
+              data?.roles
             );
 
-          } catch (employeeError) {
 
-            if (
-              employeeError.response
-                ?.status === 404
-            ) {
+          const restoredIsManagement =
+            restoredRoles.includes(
+              "ADMIN"
+            ) ||
+            restoredRoles.includes(
+              "SUPERVISOR"
+            );
 
-              saveEmployee(null);
 
-            } else {
+          /*
+           * Management users don't
+           * need employee lookup.
+           */
 
-              console.error(
-                "Unable to restore employee profile:",
-                employeeError
+          if (
+            restoredIsManagement
+          ) {
+
+            saveEmployee(
+              null
+            );
+
+          } else {
+
+            try {
+
+              const employeeResponse =
+                await getMyProfile();
+
+
+              saveEmployee(
+                employeeResponse.data
               );
 
-              saveEmployee(null);
+            } catch (
+              employeeError
+            ) {
+
+              if (
+                employeeError
+                  .response
+                  ?.status ===
+                404
+              ) {
+
+                saveEmployee(
+                  null
+                );
+
+              } else {
+
+                console.error(
+                  "Unable to restore employee profile:",
+                  employeeError
+                );
+
+                saveEmployee(
+                  null
+                );
+              }
             }
           }
 
@@ -410,18 +664,23 @@ export function AuthProvider({
             error
           );
 
+
           clearAuthentication();
 
         } finally {
 
-          setLoading(false);
+          setLoading(
+            false
+          );
         }
       };
 
 
     restoreSession();
 
-  }, [accessToken]);
+  }, [
+    accessToken,
+  ]);
 
 
   const value =
@@ -430,16 +689,34 @@ export function AuthProvider({
         user,
         employee,
         employeeStatus,
+
+        roles,
+
+        isAdmin,
+        isSupervisor,
+        isManagementUser,
+
         accessToken,
         loading,
+
         login,
         logout,
+
         refreshEmployeeProfile,
+        loadEmployeeProfile,
       }),
+
       [
         user,
         employee,
         employeeStatus,
+
+        roles,
+
+        isAdmin,
+        isSupervisor,
+        isManagementUser,
+
         accessToken,
         loading,
       ]
@@ -457,6 +734,7 @@ export function AuthProvider({
 
 
 export function useAuth() {
+
   return useContext(
     AuthContext
   );

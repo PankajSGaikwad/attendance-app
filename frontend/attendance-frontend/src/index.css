@@ -68,19 +68,23 @@ body::before {
 
 .sidebar {
   position: fixed;
+
   left: 0;
   top: 0;
   bottom: 0;
 
   width: 260px;
 
-  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+
+  padding: 24px 16px 18px;
 
   background:
     linear-gradient(
       180deg,
-      rgba(12, 16, 25, 0.96),
-      rgba(5, 8, 13, 0.98)
+      rgba(12, 16, 25, 0.98),
+      rgba(5, 8, 13, 0.99)
     );
 
   border-right:
@@ -88,6 +92,8 @@ body::before {
     rgba(255, 255, 255, 0.07);
 
   z-index: 50;
+
+  overflow: hidden;
 }
 
 .brand {
@@ -96,6 +102,40 @@ body::before {
   gap: 11px;
 
   padding: 6px 10px 30px;
+}
+
+.sidebar-navigation {
+  flex: 1;
+
+  min-height: 0;
+
+  overflow-y: auto;
+
+  padding-right: 2px;
+
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    rgba(255,255,255,0.08)
+    transparent;
+}
+
+
+.sidebar-navigation::-webkit-scrollbar {
+  width: 4px;
+}
+
+
+.sidebar-navigation::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.sidebar-navigation::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+
+  background:
+    rgba(255,255,255,0.08);
 }
 
 .brand-mark {
@@ -144,7 +184,7 @@ body::before {
 }
 
 .nav-section {
-  margin-bottom: 28px;
+  margin-bottom: 18px;
 }
 
 .nav-label {
@@ -210,10 +250,9 @@ body::before {
 }
 
 .sidebar-footer {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 22px;
+  flex-shrink: 0;
+
+  padding-top: 14px;
 }
 
 .help-card {

@@ -13,19 +13,21 @@ export default function ProtectedRoute() {
 
   const {
     accessToken,
+    user,
     employee,
     employeeStatus,
+    isManagementUser,
     loading,
   } = useAuth();
+
 
   const location =
     useLocation();
 
 
   /*
-   * Wait until authentication
-   * and employee profile lookup
-   * are completed.
+   * Wait for authentication
+   * restoration.
    */
 
   if (loading) {
@@ -45,7 +47,7 @@ export default function ProtectedRoute() {
 
 
   /*
-   * No authentication.
+   * Not authenticated.
    */
 
   if (!accessToken) {
@@ -67,10 +69,74 @@ export default function ProtectedRoute() {
 
 
   /*
-   * Pages that are allowed
-   * before employee profile
-   * exists.
+   * =========================================
+   * ADMIN / SUPERVISOR
+   * =========================================
    */
+
+  if (
+    isManagementUser
+  ) {
+
+    /*
+     * Management users should
+     * never enter employee
+     * onboarding.
+     */
+
+    const employeeOnlyPaths = [
+      "/complete-profile",
+      "/profile-pending",
+    ];
+
+
+    if (
+      employeeOnlyPaths.includes(
+        currentPath
+      )
+    ) {
+
+      return (
+        <Navigate
+          to="/admin"
+          replace
+        />
+      );
+    }
+
+
+    /*
+     * If an admin lands on the
+     * employee dashboard, send
+     * them to management.
+     */
+
+    if (
+      currentPath ===
+      "/dashboard"
+    ) {
+
+      return (
+        <Navigate
+          to="/admin"
+          replace
+        />
+      );
+    }
+
+
+    return (
+      <Outlet />
+    );
+  }
+
+
+  /*
+   * =========================================
+   * NORMAL EMPLOYEE
+   * =========================================
+   */
+
 
   const profileSetupPaths = [
     "/complete-profile",
@@ -86,9 +152,6 @@ export default function ProtectedRoute() {
 
   /*
    * No employee profile.
-   *
-   * Send the authenticated
-   * user to profile creation.
    */
 
   if (
@@ -106,10 +169,7 @@ export default function ProtectedRoute() {
 
 
   /*
-   * DRAFT profile.
-   *
-   * User needs to complete
-   * or edit their information.
+   * DRAFT.
    */
 
   if (
@@ -128,10 +188,7 @@ export default function ProtectedRoute() {
 
 
   /*
-   * PENDING profile.
-   *
-   * User must wait for admin
-   * approval.
+   * PENDING.
    */
 
   if (
@@ -150,11 +207,7 @@ export default function ProtectedRoute() {
 
 
   /*
-   * REJECTED profile.
-   *
-   * Allow the user to return
-   * to the profile page and
-   * make corrections.
+   * REJECTED.
    */
 
   if (
@@ -173,16 +226,12 @@ export default function ProtectedRoute() {
 
 
   /*
-   * SUSPENDED employee.
-   *
-   * We haven't created the
-   * suspension page yet, so
-   * keep them away from the
-   * application for now.
+   * SUSPENDED.
    */
 
   if (
-    employeeStatus === "SUSPENDED"
+    employeeStatus ===
+    "SUSPENDED"
   ) {
 
     return (
@@ -213,7 +262,7 @@ export default function ProtectedRoute() {
 
 
   /*
-   * Everything is fine.
+   * Employee is allowed.
    */
 
   return (

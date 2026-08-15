@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Clock3,
   IdCard,
-  LayoutDashboard,
   QrCode,
   Settings2,
   Users,
@@ -17,11 +16,12 @@ import {
   NavLink,
 } from "react-router-dom";
 
+
 const employeeLinks = [
   {
     path: "/dashboard",
     label: "Dashboard",
-    icon: LayoutDashboard,
+    icon: BarChart3,
   },
   {
     path: "/attendance",
@@ -44,6 +44,7 @@ const employeeLinks = [
     icon: QrCode,
   },
 ];
+
 
 const adminLinks = [
   {
@@ -83,12 +84,15 @@ const adminLinks = [
   },
 ];
 
+
 function NavigationItem({
   item,
   onClose,
 }) {
 
-  const Icon = item.icon;
+  const Icon =
+    item.icon;
+
 
   return (
 
@@ -119,6 +123,7 @@ function NavigationItem({
   );
 }
 
+
 export default function Sidebar({
   mobileOpen,
   onClose,
@@ -129,11 +134,14 @@ export default function Sidebar({
     <>
 
       {mobileOpen && (
+
         <div
           className="sidebar-overlay"
           onClick={onClose}
         />
+
       )}
+
 
       <aside
         className={`sidebar ${
@@ -143,13 +151,17 @@ export default function Sidebar({
         }`}
       >
 
+        {/* BRAND */}
+
         <div className="brand">
 
           <div className="brand-mark">
             <QrCode size={21} />
           </div>
 
+
           <div>
+
             <strong>
               Attend<span>ance</span>
             </strong>
@@ -157,65 +169,104 @@ export default function Sidebar({
             <small>
               WORKFORCE HUB
             </small>
+
           </div>
 
+
           <button
+            type="button"
             className="icon-btn mobile-only"
             onClick={onClose}
+            aria-label="Close menu"
           >
             <X size={18} />
           </button>
 
         </div>
 
-        <div className="nav-section">
 
-          <div className="nav-label">
-            WORKSPACE
-          </div>
+        {/* SCROLLABLE NAVIGATION */}
 
-          {employeeLinks.map(
-            (item) => (
-              <NavigationItem
-                key={item.path}
-                item={item}
-                onClose={onClose}
-              />
-            )
+        <div className="sidebar-navigation">
+
+          {isAdmin ? (
+
+            /*
+             * ADMIN
+             *
+             * Admin users don't need the
+             * employee workspace navigation.
+             */
+
+            <div className="nav-section">
+
+              <div className="nav-label">
+                ADMINISTRATION
+              </div>
+
+
+              {adminLinks.map(
+                (item) => (
+
+                  <NavigationItem
+                    key={item.path}
+                    item={item}
+                    onClose={onClose}
+                  />
+
+                )
+              )}
+
+            </div>
+
+          ) : (
+
+            /*
+             * EMPLOYEE
+             */
+
+            <div className="nav-section">
+
+              <div className="nav-label">
+                WORKSPACE
+              </div>
+
+
+              {employeeLinks.map(
+                (item) => (
+
+                  <NavigationItem
+                    key={item.path}
+                    item={item}
+                    onClose={onClose}
+                  />
+
+                )
+              )}
+
+            </div>
+
           )}
 
         </div>
 
-        {isAdmin && (
 
-          <div className="nav-section">
-
-            <div className="nav-label">
-              MANAGEMENT
-            </div>
-
-            {adminLinks.map(
-              (item) => (
-                <NavigationItem
-                  key={item.path}
-                  item={item}
-                  onClose={onClose}
-                />
-              )
-            )}
-
-          </div>
-
-        )}
+        {/* SYSTEM STATUS */}
 
         <div className="sidebar-footer">
 
           <div className="help-card">
 
             <div className="system-status">
+
               <span className="status-dot" />
-              System operational
+
+              <span>
+                System operational
+              </span>
+
             </div>
+
 
             <div className="help-text">
               Attendance services
@@ -227,6 +278,7 @@ export default function Sidebar({
         </div>
 
       </aside>
+
     </>
   );
 }

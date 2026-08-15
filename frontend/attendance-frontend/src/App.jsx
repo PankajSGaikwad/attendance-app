@@ -4,13 +4,19 @@ import {
   Routes,
 } from "react-router-dom";
 
-import { AuthProvider } from "./auth/AuthContext";
+import {
+  AuthProvider,
+} from "./auth/AuthContext";
+
 import ProtectedRoute from "./auth/ProtectedRoute";
+
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
+
 import AppShell from "./components/layout/AppShell";
+
 
 import Dashboard from "./pages/employee/Dashboard";
 import Attendance from "./pages/employee/Attendance";
@@ -18,11 +24,19 @@ import CompleteProfile from "./pages/employee/CompleteProfile";
 import ProfilePending from "./pages/employee/ProfilePending";
 
 
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import Employees from "./pages/admin/Employees";
+import EmployeeReview from "./pages/admin/EmployeeReview";
+
+
 function App() {
+
   return (
+
     <AuthProvider>
 
       <Routes>
+
 
         {/* =========================================
             PUBLIC
@@ -30,12 +44,17 @@ function App() {
 
         <Route
           path="/login"
-          element={<Login />}
+          element={
+            <Login />
+          }
         />
+
 
         <Route
           path="/register"
-          element={<Register />}
+          element={
+            <Register />
+          }
         />
 
 
@@ -44,22 +63,37 @@ function App() {
             ========================================= */}
 
         <Route
-          element={<ProtectedRoute />}
+          element={
+            <ProtectedRoute />
+          }
         >
 
           <Route
-            element={<AppShell />}
+            element={
+              <AppShell />
+            }
           >
+
+
+            {/* =====================================
+                EMPLOYEE
+                ===================================== */}
 
             <Route
               path="/dashboard"
-              element={<Dashboard />}
+              element={
+                <Dashboard />
+              }
             />
+
 
             <Route
               path="/attendance"
-              element={<Attendance />}
+              element={
+                <Attendance />
+              }
             />
+
 
             <Route
               path="/complete-profile"
@@ -68,12 +102,42 @@ function App() {
               }
             />
 
+
             <Route
               path="/profile-pending"
               element={
                 <ProfilePending />
               }
             />
+
+
+            {/* =====================================
+                ADMIN
+                ===================================== */}
+
+            <Route
+              path="/admin"
+              element={
+                <AdminDashboard />
+              }
+            />
+
+
+            <Route
+              path="/admin/employees"
+              element={
+                <Employees />
+              }
+            />
+
+
+            <Route
+              path="/admin/employees/:id"
+              element={
+                <EmployeeReview />
+              }
+            />
+
 
           </Route>
 
