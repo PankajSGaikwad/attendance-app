@@ -1,8 +1,13 @@
+/* =========================================================
+   PAGE
+   ========================================================= */
+
 .attendance-page {
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
 }
+
 
 /* =========================================================
    FLOW
@@ -21,9 +26,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-
   flex: 0 0 auto;
-
   color: #71717a;
   font-size: 12px;
   font-weight: 600;
@@ -74,13 +77,13 @@
   background: rgba(34, 197, 94, 0.08);
 }
 
+
 /* =========================================================
    MAIN PANEL
    ========================================================= */
 
 .attendance-panel {
   width: 100%;
-
   min-height: 500px;
 
   padding: 28px;
@@ -100,6 +103,7 @@
   box-shadow:
     0 25px 80px rgba(0, 0, 0, 0.25);
 }
+
 
 /* =========================================================
    CARD
@@ -130,6 +134,7 @@
   text-align: center;
 }
 
+
 /* =========================================================
    HEADER
    ========================================================= */
@@ -138,6 +143,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
+
   margin-bottom: 24px;
 }
 
@@ -203,8 +209,9 @@
   line-height: 1.6;
 }
 
+
 /* =========================================================
-   QR SCANNER
+   QR CAMERA
    ========================================================= */
 
 .qr-scanner-wrapper {
@@ -212,7 +219,7 @@
 
   width: 100%;
 
-  min-height: 390px;
+  min-height: 430px;
 
   overflow: hidden;
 
@@ -223,62 +230,18 @@
   background: #020305;
 }
 
-.attendance-qr-reader {
+.attendance-qr-video {
+  display: block;
+
   width: 100%;
-  min-height: 390px;
-}
-
-/*
- * html5-qrcode creates its own video.
- */
-
-.attendance-qr-reader video {
-  width: 100% !important;
-
-  height: 390px !important;
+  height: 430px;
 
   object-fit: cover;
 
-  border-radius: 17px;
+  background: #000;
 }
 
-/*
- * Hide html5-qrcode's default ugly
- * dashboard elements.
- */
-
-.attendance-qr-reader img {
-  display: none !important;
-}
-
-.attendance-qr-reader__dashboard {
-  padding: 12px !important;
-
-  background: rgba(5, 7, 11, 0.95);
-
-  color: #a1a1aa;
-}
-
-.attendance-qr-reader__dashboard_section {
-  color: #a1a1aa;
-}
-
-.attendance-qr-reader__dashboard_section_csr {
-  color: #a1a1aa;
-}
-
-.attendance-qr-reader button {
-  padding: 8px 14px;
-
-  border: 1px solid rgba(255, 255, 255, 0.08);
-
-  border-radius: 8px;
-
-  background: rgba(255, 255, 255, 0.05);
-
-  color: #fff;
-}
-
+.scanner-empty,
 .scanner-loading {
   position: absolute;
 
@@ -294,28 +257,151 @@
 
   justify-content: center;
 
-  gap: 12px;
+  gap: 10px;
 
   background:
-    rgba(2, 3, 5, 0.82);
+    radial-gradient(
+      circle at center,
+      rgba(20, 30, 50, 0.5),
+      rgba(2, 3, 5, 0.96)
+    );
 
-  color: #a1a1aa;
-
-  pointer-events: none;
+  text-align: center;
 }
 
+.scanner-empty svg,
 .scanner-loading svg {
-  color: #60a5fa;
+  color: #38bdf8;
 }
+
+.scanner-empty strong,
+.scanner-loading strong {
+  color: #f4f4f5;
+  font-size: 16px;
+}
+
+.scanner-empty span,
+.scanner-loading span {
+  max-width: 320px;
+  color: #71717a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 
 /* =========================================================
-   TIMER
+   QR FRAME
+   ========================================================= */
+
+.qr-frame {
+  position: absolute;
+
+  width: 280px;
+  height: 280px;
+
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+
+  pointer-events: none;
+
+  z-index: 4;
+}
+
+.qr-corner {
+  position: absolute;
+
+  width: 44px;
+  height: 44px;
+
+  border-color: #38bdf8;
+  border-style: solid;
+}
+
+.qr-corner.top-left {
+  top: 0;
+  left: 0;
+
+  border-width: 4px 0 0 4px;
+
+  border-radius: 12px 0 0 0;
+}
+
+.qr-corner.top-right {
+  top: 0;
+  right: 0;
+
+  border-width: 4px 4px 0 0;
+
+  border-radius: 0 12px 0 0;
+}
+
+.qr-corner.bottom-left {
+  bottom: 0;
+  left: 0;
+
+  border-width: 0 0 4px 4px;
+
+  border-radius: 0 0 0 12px;
+}
+
+.qr-corner.bottom-right {
+  bottom: 0;
+  right: 0;
+
+  border-width: 0 4px 4px 0;
+
+  border-radius: 0 0 12px 0;
+}
+
+.qr-scan-line {
+  position: absolute;
+
+  left: 12px;
+  right: 12px;
+
+  top: 50%;
+
+  height: 2px;
+
+  background: #38bdf8;
+
+  box-shadow:
+    0 0 15px rgba(56, 189, 248, 0.9);
+
+  animation: qrScan 2s ease-in-out infinite;
+}
+
+@keyframes qrScan {
+  0% {
+    transform: translateY(-110px);
+    opacity: 0.25;
+  }
+
+  50% {
+    transform: translateY(110px);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-110px);
+    opacity: 0.25;
+  }
+}
+
+
+/* =========================================================
+   COUNTDOWN
    ========================================================= */
 
 .attendance-countdown {
   display: flex;
+
   align-items: center;
+
   justify-content: center;
+
   gap: 8px;
 
   margin-bottom: 16px;
@@ -331,6 +417,7 @@
   color: #93c5fd;
 
   font-size: 13px;
+
   font-weight: 700;
 }
 
@@ -342,61 +429,9 @@
   color: #fca5a5;
 }
 
-/* =========================================================
-   EMPLOYEE SUMMARY
-   ========================================================= */
-
-.attendance-employee-summary {
-  display: grid;
-
-  grid-template-columns:
-    repeat(4, minmax(0, 1fr));
-
-  gap: 10px;
-
-  margin-bottom: 18px;
-}
-
-.attendance-employee-summary > div {
-  padding: 13px;
-
-  border-radius: 11px;
-
-  border: 1px solid rgba(255, 255, 255, 0.06);
-
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.attendance-employee-summary span {
-  display: block;
-
-  margin-bottom: 5px;
-
-  color: #71717a;
-
-  font-size: 10px;
-
-  text-transform: uppercase;
-
-  letter-spacing: 0.8px;
-}
-
-.attendance-employee-summary strong {
-  display: block;
-
-  overflow: hidden;
-
-  color: #e4e4e7;
-
-  font-size: 12px;
-
-  white-space: nowrap;
-
-  text-overflow: ellipsis;
-}
 
 /* =========================================================
-   CAMERA
+   PHOTO CAMERA
    ========================================================= */
 
 .attendance-camera {
@@ -444,14 +479,31 @@
   gap: 12px;
 
   background:
-    rgba(0, 0, 0, 0.72);
+    radial-gradient(
+      circle at center,
+      rgba(20, 30, 50, 0.45),
+      rgba(0, 0, 0, 0.96)
+    );
 
-  color: #a1a1aa;
+  color: #71717a;
 }
 
 .camera-overlay svg {
   color: #60a5fa;
 }
+
+.camera-overlay strong {
+  color: #f4f4f5;
+}
+
+.camera-overlay span {
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   FACE GUIDE
+   ========================================================= */
 
 .camera-face-guide {
   position: absolute;
@@ -474,12 +526,14 @@
 
   height: 280px;
 
-  border: 2px solid rgba(96, 165, 250, 0.7);
+  border:
+    2px solid
+    rgba(96, 165, 250, 0.75);
 
   border-radius: 50%;
 
   box-shadow:
-    0 0 0 9999px rgba(0, 0, 0, 0.18);
+    0 0 0 9999px rgba(0, 0, 0, 0.15);
 }
 
 .camera-face-guide span {
@@ -489,16 +543,14 @@
 
   border-radius: 999px;
 
-  background: rgba(0, 0, 0, 0.65);
+  background:
+    rgba(0, 0, 0, 0.65);
 
   color: #e4e4e7;
 
   font-size: 11px;
 }
 
-.attendance-hidden-canvas {
-  display: none;
-}
 
 /* =========================================================
    PHOTO PREVIEW
@@ -513,9 +565,15 @@
 
   border-radius: 16px;
 
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.08);
 
   background: #000;
+}
+
+.attendance-photo-preview.small {
+  width: min(280px, 100%);
 }
 
 .attendance-photo-preview img {
@@ -528,8 +586,61 @@
   object-fit: cover;
 }
 
+
 /* =========================================================
    LOCATION
+   ========================================================= */
+
+.location-verification {
+  padding: 45px 25px;
+
+  text-align: center;
+
+  border-radius: 16px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.06);
+
+  background:
+    rgba(255, 255, 255, 0.02);
+}
+
+.location-icon {
+  width: 76px;
+  height: 76px;
+
+  display: grid;
+
+  place-items: center;
+
+  margin: 0 auto 18px;
+
+  border-radius: 50%;
+
+  color: #4ade80;
+
+  background:
+    rgba(34, 197, 94, 0.09);
+}
+
+.location-verification h3 {
+  margin: 0;
+
+  color: #f4f4f5;
+
+  font-size: 18px;
+}
+
+.location-verification p {
+  max-width: 430px;
+
+  margin: 8px auto 0;
+}
+
+
+/* =========================================================
+   LOCATION RESULT
    ========================================================= */
 
 .attendance-location {
@@ -545,9 +656,12 @@
 
   border-radius: 14px;
 
-  border: 1px solid rgba(34, 197, 94, 0.18);
+  border:
+    1px solid
+    rgba(34, 197, 94, 0.18);
 
-  background: rgba(34, 197, 94, 0.06);
+  background:
+    rgba(34, 197, 94, 0.06);
 
   color: #4ade80;
 }
@@ -569,6 +683,150 @@
 
   font-size: 11px;
 }
+
+
+/* =========================================================
+   REVIEW
+   ========================================================= */
+
+.attendance-review {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 10px;
+
+  margin-top: 10px;
+}
+
+.review-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 14px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.06);
+
+  border-radius: 13px;
+
+  background:
+    rgba(255, 255, 255, 0.025);
+}
+
+.review-item > div:nth-child(2) {
+  flex: 1;
+}
+
+.review-item span {
+  display: block;
+
+  color: #71717a;
+
+  font-size: 11px;
+}
+
+.review-item strong {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #e4e4e7;
+
+  font-size: 13px;
+}
+
+.review-icon {
+  width: 40px;
+  height: 40px;
+
+  display: grid;
+
+  place-items: center;
+
+  border-radius: 11px;
+}
+
+.review-icon.green {
+  color: #4ade80;
+
+  background:
+    rgba(34, 197, 94, 0.09);
+}
+
+.review-icon.purple {
+  color: #c084fc;
+
+  background:
+    rgba(168, 85, 247, 0.1);
+}
+
+.review-check {
+  color: #4ade80;
+}
+
+
+/* =========================================================
+   SUCCESS
+   ========================================================= */
+
+.attendance-success-icon {
+  width: 78px;
+  height: 78px;
+
+  display: grid;
+
+  place-items: center;
+
+  margin: 10px auto 18px;
+
+  border-radius: 50%;
+
+  color: #4ade80;
+
+  background:
+    rgba(34, 197, 94, 0.1);
+
+  border:
+    1px solid
+    rgba(34, 197, 94, 0.2);
+}
+
+.success-summary {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  justify-content: center;
+
+  gap: 10px;
+
+  margin: 25px 0;
+}
+
+.success-summary div {
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+
+  padding: 9px 12px;
+
+  border-radius: 999px;
+
+  background:
+    rgba(34, 197, 94, 0.08);
+
+  color: #4ade80;
+
+  font-size: 11px;
+}
+
 
 /* =========================================================
    BUTTONS
@@ -603,6 +861,8 @@
 
   font-weight: 700;
 
+  cursor: pointer;
+
   transition:
     transform 150ms ease,
     opacity 150ms ease,
@@ -620,7 +880,9 @@
 }
 
 .attendance-btn.primary {
-  border: 1px solid rgba(96, 165, 250, 0.25);
+  border:
+    1px solid
+    rgba(96, 165, 250, 0.25);
 
   background:
     linear-gradient(
@@ -632,13 +894,17 @@
   color: #fff;
 
   box-shadow:
-    0 8px 25px rgba(37, 99, 235, 0.18);
+    0 8px 25px
+    rgba(37, 99, 235, 0.18);
 }
 
 .attendance-btn.secondary {
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.09);
 
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    rgba(255, 255, 255, 0.04);
 
   color: #d4d4d8;
 }
@@ -646,6 +912,7 @@
 .attendance-btn.full {
   width: 100%;
 }
+
 
 /* =========================================================
    MESSAGES
@@ -664,9 +931,12 @@
 
   border-radius: 11px;
 
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border:
+    1px solid
+    rgba(239, 68, 68, 0.25);
 
-  background: rgba(239, 68, 68, 0.08);
+  background:
+    rgba(239, 68, 68, 0.08);
 
   color: #fca5a5;
 
@@ -690,7 +960,8 @@
 
   border-radius: 10px;
 
-  background: rgba(37, 99, 235, 0.07);
+  background:
+    rgba(37, 99, 235, 0.07);
 
   color: #93c5fd;
 
@@ -717,92 +988,105 @@
   color: #60a5fa;
 }
 
-/* =========================================================
-   SUCCESS
-   ========================================================= */
-
-.attendance-success-icon {
-  width: 72px;
-  height: 72px;
-
-  display: grid;
-
-  place-items: center;
-
-  margin: 10px auto 18px;
-
-  border-radius: 50%;
-
-  color: #4ade80;
-
-  border: 1px solid rgba(34, 197, 94, 0.2);
-
-  background: rgba(34, 197, 94, 0.08);
-
-  box-shadow:
-    0 0 40px rgba(34, 197, 94, 0.08);
-}
-
-.attendance-center-title {
-  text-align: center;
-
-  margin-top: 8px !important;
-}
-
-.attendance-center-description {
-  max-width: 500px;
-
-  margin-left: auto !important;
-  margin-right: auto !important;
-
-  text-align: center;
-}
 
 /* =========================================================
-   SPINNER
+   TESTING FALLBACK
    ========================================================= */
 
-.spinner {
-  width: 14px;
-  height: 14px;
+.attendance-test {
+  margin-top: 18px;
 
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top:
+    1px solid
+    rgba(255, 255, 255, 0.06);
 
-  border-top-color: #60a5fa;
-
-  border-radius: 50%;
-
-  animation:
-    attendance-spin
-    0.7s linear infinite;
+  padding-top: 15px;
 }
 
-@keyframes attendance-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.attendance-test summary {
+  cursor: pointer;
+
+  color: #71717a;
+
+  font-size: 11px;
 }
+
+.attendance-test-body {
+  display: flex;
+
+  gap: 10px;
+
+  align-items: flex-end;
+
+  margin-top: 12px;
+}
+
+.attendance-test-body label {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  overflow: hidden;
+}
+
+.attendance-test-body input {
+  flex: 1;
+
+  min-width: 0;
+
+  height: 44px;
+
+  padding: 0 13px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.08);
+
+  border-radius: 10px;
+
+  outline: none;
+
+  background:
+    rgba(255, 255, 255, 0.03);
+
+  color: #e4e4e7;
+}
+
+.attendance-test-body input:focus {
+  border-color:
+    rgba(59, 130, 246, 0.55);
+}
+
 
 /* =========================================================
-   MOBILE
+   RESPONSIVE
    ========================================================= */
 
-@media (max-width: 760px) {
-
+@media (max-width: 768px) {
   .attendance-panel {
-    padding: 14px;
+    padding: 15px;
   }
 
   .attendance-card {
     padding: 18px;
   }
 
-  .attendance-card h2 {
-    font-size: 20px;
+  .attendance-card-header {
+    align-items: flex-start;
   }
 
-  .attendance-employee-summary {
-    grid-template-columns: 1fr 1fr;
+  .qr-scanner-wrapper {
+    min-height: 330px;
+  }
+
+  .attendance-qr-video {
+    height: 330px;
+  }
+
+  .qr-frame {
+    width: 220px;
+    height: 220px;
   }
 
   .attendance-actions {
@@ -813,39 +1097,45 @@
     width: 100%;
   }
 
-  .qr-scanner-wrapper,
-  .attendance-qr-reader {
-    min-height: 320px;
+  .attendance-test-body {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .attendance-qr-reader video {
-    height: 320px !important;
+  .attendance-test-body input {
+    width: 100%;
   }
 
   .face-oval {
-    width: 160px;
-    height: 220px;
+    width: 170px;
+    height: 225px;
   }
-
 }
 
 @media (max-width: 480px) {
-
-  .attendance-flow {
-    gap: 7px;
+  .attendance-card {
+    padding: 14px;
   }
 
-  .attendance-flow-step {
-    font-size: 10px;
+  .attendance-card h2 {
+    font-size: 20px;
   }
 
-  .attendance-flow-number {
-    width: 24px;
-    height: 24px;
+  .attendance-icon {
+    width: 42px;
+    height: 42px;
   }
 
-  .attendance-employee-summary {
-    grid-template-columns: 1fr;
+  .qr-scanner-wrapper {
+    min-height: 280px;
   }
 
+  .attendance-qr-video {
+    height: 280px;
+  }
+
+  .qr-frame {
+    width: 190px;
+    height: 190px;
+  }
 }

@@ -10,6 +10,9 @@ import {
   Upload,
   Clock3,
   XCircle,
+  Play,
+  Square,
+  UserRound,
 } from "lucide-react";
 
 import {
@@ -19,7 +22,7 @@ import {
   useState,
 } from "react";
 
-import { Html5Qrcode } from "html5-qrcode";
+import { BrowserQRCodeReader } from "@zxing/browser";
 
 import PageHeader from "../../components/common/PageHeader";
 
@@ -30,299 +33,576 @@ import {
 
 import api from "../../api/client";
 
+import "./attendance.css";
+
 
 function Attendance() {
+  /* =========================================================
+     FLOW
+     ========================================================= */
+
   const [step, setStep] = useState(1);
+
+  /*
+    1 = Scan QR
+    2 = Verify
+    3 = Photo
+    4 = Location
+    5 = Complete
+    6 = Success
+  */
+
+
+  /* =========================================================
+     QR STATE
+     ========================================================= */
 
   const [qrValue, setQrValue] = useState("");
 
+  const [scannerRunning, setScannerRunning] =
+    useState(false);
+
+  const [scannerStarting, setScannerStarting] =
+    useState(false);
+
+
+  /* =========================================================
+     ATTENDANCE ATTEMPT
+     ========================================================= */
+
   const [attempt, setAttempt] = useState(null);
 
-  const [photoId, setPhotoId] = useState("");
-
-  const [photoPreview, setPhotoPreview] = useState("");
-
-  const [location, setLocation] = useState(null);
-
-  const [message, setMessage] = useState("");
-
-  const [error, setError] = useState("");
-
-  const [scannerRunning, setScannerRunning] = useState(false);
-
-  const [cameraRunning, setCameraRunning] = useState(false);
-
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
-  const [completing, setCompleting] = useState(false);
-
-  const [remainingSeconds, setRemainingSeconds] = useState(null);
+  const [remainingSeconds, setRemainingSeconds] =
+    useState(null);
 
 
-  const scannerRef = useRef(null);
+  /* =========================================================
+     PHOTO
+     ========================================================= */
 
-  const scannerStartedRef = useRef(false);
+  const [cameraRunning, setCameraRunning] =
+    useState(false);
 
-  const scanLockedRef = useRef(false);
+  const [cameraStarting, setCameraStarting] =
+    useState(false);
 
-  const videoRef = useRef(null);
+  const [photoId, setPhotoId] =
+    useState("");
 
-  const photoStreamRef = useRef(null);
+  const [photoPreview, setPhotoPreview] =
+    useState("");
 
-  const canvasRef = useRef(null);
-
-
-  /*
-   * ---------------------------------------------------------
-   * ERROR HANDLING
-   * ---------------------------------------------------------
-   */
-
-  const getErrorMessage = useCallback((err) => {
-    return (
-      err?.response?.data?.message ||
-      err?.response?.data?.error ||
-      err?.message ||
-      "Something went wrong. Please try again."
-    );
-  }, []);
+  const [uploadingPhoto, setUploadingPhoto] =
+    useState(false);
 
 
-  /*
-   * ---------------------------------------------------------
-   * STOP QR SCANNER
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     LOCATION
+     ========================================================= */
 
-  const stopQrScanner = useCallback(async () => {
+  const [location, setLocation] =
+    useState(null);
+
+  const [locationLoading, setLocationLoading] =
+    useState(false);
+
+
+  /* =========================================================
+     COMPLETION
+     ========================================================= */
+
+  const [completing, setCompleting] =
+    useState(false);
+
+
+  /* =========================================================
+     MESSAGES
+     ========================================================= */
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+
+  /* =========================================================
+     REFS
+     ========================================================= */
+
+  const qrVideoRef =
+    useRef(null);
+
+  const qrReaderRef =
+    useRef(null);
+
+  const qrControlsRef =
+    useRef(null);
+
+  const qrLockedRef =
+    useRef(false);
+
+  const photoVideoRef =
+    useRef(null);
+
+  const photoStreamRef =
+    useRef(null);
+
+  const canvasRef =
+    useRef(null);
+
+
+  /* =========================================================
+     ERROR MESSAGE
+     ========================================================= */
+
+  const getErrorMessage = useCallback(
+    (err) => {
+      return (
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.response?.data?.details ||
+        err?.message ||
+        "Something went wrong. Please try again."
+      );
+    },
+    []
+  );
+
+
+  /* =========================================================
+     STOP QR CAMERA
+     ========================================================= */
+
+  const stopQrScanner = useCallback(() => {
     try {
-      if (
-        scannerRef.current &&
-        scannerStartedRef.current
-      ) {
-        await scannerRef.current.stop();
+      if (qrControlsRef.current) {
+        qrControlsRef.current.stop();
       }
     } catch (err) {
       console.warn(
-        "Unable to stop QR scanner:",
+        "Unable to stop QR controls:",
         err
       );
     }
 
+    qrControlsRef.current = null;
+
     try {
-      if (scannerRef.current) {
-        scannerRef.current.clear();
+      if (qrReaderRef.current) {
+        qrReaderRef.current.reset();
       }
     } catch (err) {
       console.warn(
-        "Unable to clear QR scanner:",
+        "Unable to reset QR reader:",
         err
       );
     }
 
-    scannerRef.current = null;
+    qrReaderRef.current = null;
 
-    scannerStartedRef.current = false;
+    if (qrVideoRef.current) {
+      const video =
+        qrVideoRef.current;
+
+      if (video.srcObject) {
+        const stream =
+          video.srcObject;
+
+        stream
+          .getTracks()
+          .forEach((track) => {
+            track.stop();
+          });
+      }
+
+      video.pause();
+
+      video.srcObject = null;
+    }
 
     setScannerRunning(false);
+    setScannerStarting(false);
   }, []);
 
 
-  /*
-   * ---------------------------------------------------------
-   * START QR SCANNER
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     START QR SCANNER
+     ========================================================= */
 
-  const startQrScanner = useCallback(async () => {
-    setError("");
-    setMessage("");
+  const startQrScanner = useCallback(
+    async () => {
+      if (scannerStarting) {
+        return;
+      }
 
-    scanLockedRef.current = false;
+      setError("");
+      setMessage("");
 
-    try {
-      await stopQrScanner();
+      qrLockedRef.current = false;
 
-      const scanner = new Html5Qrcode(
-        "attendance-qr-reader"
-      );
+      setScannerStarting(true);
 
-      scannerRef.current = scanner;
+      try {
+        stopQrScanner();
 
-      await scanner.start(
-        {
-          facingMode: {
-            exact: "environment",
-          },
-        },
-        {
-          fps: 10,
-
-          qrbox: {
-            width: 280,
-            height: 280,
-          },
-
-          aspectRatio: 1,
-
-          disableFlip: false,
-        },
-
-        async (decodedText) => {
-          if (scanLockedRef.current) {
-            return;
-          }
-
-          scanLockedRef.current = true;
-
-          setQrValue(decodedText);
-
-          await stopQrScanner();
-
-          await handleQrSubmit(decodedText);
-        },
-
-        () => {
-          /*
-           * QR decode errors happen continuously while
-           * scanning. Do not display them to the user.
-           */
+        if (
+          !navigator.mediaDevices ||
+          !navigator.mediaDevices.getUserMedia
+        ) {
+          throw new Error(
+            "Camera access is not supported by this browser."
+          );
         }
+
+        /*
+         * Create a fresh QR reader.
+         */
+        const reader =
+          new BrowserQRCodeReader();
+
+        qrReaderRef.current = reader;
+
+        /*
+         * Use environment/rear camera where possible.
+         *
+         * IMPORTANT:
+         * We use "ideal", not "exact".
+         *
+         * "exact: environment" was one of
+         * the reasons your previous implementation
+         * could fail on Chrome/devices.
+         */
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: {
+              ideal: "environment",
+            },
+            width: {
+              ideal: 1280,
+            },
+            height: {
+              ideal: 720,
+            },
+          },
+        };
+
+        /*
+         * Start decoding directly from the video element.
+         */
+        const controls =
+          await reader.decodeFromConstraints(
+            constraints,
+            qrVideoRef.current,
+            async (result, decodeError) => {
+              if (!result) {
+                /*
+                 * Normal QR decode failures happen
+                 * continuously while scanning.
+                 *
+                 * Do not display them.
+                 */
+                return;
+              }
+
+              if (
+                qrLockedRef.current
+              ) {
+                return;
+              }
+
+              qrLockedRef.current = true;
+
+              const decodedText =
+                result
+                  .getText()
+                  ?.trim();
+
+              if (!decodedText) {
+                qrLockedRef.current =
+                  false;
+
+                return;
+              }
+
+              console.log(
+                "QR detected:",
+                decodedText
+              );
+
+              setQrValue(
+                decodedText
+              );
+
+              stopQrScanner();
+
+              await handleQrSubmit(
+                decodedText
+              );
+            }
+          );
+
+        qrControlsRef.current =
+          controls;
+
+        setScannerRunning(true);
+
+        setScannerStarting(false);
+      } catch (err) {
+        console.error(
+          "QR scanner start failed:",
+          err
+        );
+
+        stopQrScanner();
+
+        setError(
+          getCameraErrorMessage(
+            err
+          )
+        );
+
+        setScannerStarting(false);
+      }
+    },
+    [
+      scannerStarting,
+      stopQrScanner,
+    ]
+  );
+
+
+  /* =========================================================
+     CAMERA ERROR MESSAGE
+     ========================================================= */
+
+  const getCameraErrorMessage =
+    (err) => {
+      const name =
+        err?.name;
+
+      if (
+        name ===
+        "NotAllowedError"
+      ) {
+        return (
+          "Camera permission was denied. Please click the camera icon in Chrome's address bar, allow Camera access for localhost, and try again."
+        );
+      }
+
+      if (
+        name ===
+        "NotFoundError"
+      ) {
+        return (
+          "No camera was found on this device."
+        );
+      }
+
+      if (
+        name ===
+        "NotReadableError"
+      ) {
+        return (
+          "The camera is already being used by another application or browser tab."
+        );
+      }
+
+      if (
+        name ===
+        "OverconstrainedError"
+      ) {
+        return (
+          "The selected camera does not support the requested settings. Please try again."
+        );
+      }
+
+      if (
+        name ===
+        "SecurityError"
+      ) {
+        return (
+          "The browser blocked camera access for security reasons."
+        );
+      }
+
+      return (
+        err?.message ||
+        "Unable to access the camera. Please check camera permission and try again."
+      );
+    };
+
+
+  /* =========================================================
+     SUBMIT QR TO BACKEND
+     ========================================================= */
+
+  const handleQrSubmit =
+    async (value = qrValue) => {
+      const finalQrValue =
+        value?.trim();
+
+      if (!finalQrValue) {
+        setError(
+          "Please scan the employee QR code."
+        );
+
+        qrLockedRef.current =
+          false;
+
+        return;
+      }
+
+      setError("");
+
+      setMessage(
+        "QR detected. Verifying employee..."
       );
 
-      scannerStartedRef.current = true;
+      try {
+        const response =
+          await startAttendanceScan({
+            qrValue:
+              finalQrValue,
+          });
 
-      setScannerRunning(true);
-    } catch (err) {
-      console.error(
-        "QR scanner error:",
-        err
-      );
+        const data =
+          response.data;
 
-      scannerRef.current = null;
+        console.log(
+          "Attendance scan response:",
+          data
+        );
 
-      scannerStartedRef.current = false;
+        setAttempt(data);
 
-      setScannerRunning(false);
+        /*
+         * Backend controls the actual TTL.
+         */
+        const ttl =
+          Number(
+            data?.expiresInSeconds
+          );
 
-      setError(
-        "Unable to access the camera. Please allow camera permission and try again."
-      );
-    }
-  }, [stopQrScanner]);
+        setRemainingSeconds(
+          Number.isFinite(ttl) &&
+            ttl > 0
+            ? ttl
+            : 60
+        );
 
+        setMessage("");
 
-  /*
-   * ---------------------------------------------------------
-   * START ATTENDANCE AFTER QR SCAN
-   * ---------------------------------------------------------
-   */
+        /*
+         * The backend may tell us whether
+         * photo/location are required.
+         *
+         * Normally your attendance flow is:
+         *
+         * QR -> Photo -> Location -> Complete
+         */
 
-  const handleQrSubmit = async (value = qrValue) => {
-    const finalQrValue = value?.trim();
+        if (
+          data?.photoRequired ===
+          false
+        ) {
+          if (
+            data?.locationRequired ===
+            false
+          ) {
+            setStep(5);
+          } else {
+            setStep(4);
+          }
+        } else {
+          setStep(3);
+        }
+      } catch (err) {
+        console.error(
+          "Attendance scan failed:",
+          err
+        );
 
-    if (!finalQrValue) {
-      setError(
-        "Please scan the employee QR code."
-      );
+        setMessage("");
 
-      scanLockedRef.current = false;
+        setError(
+          getErrorMessage(err)
+        );
 
-      return;
-    }
+        qrLockedRef.current =
+          false;
 
-    setError("");
-    setMessage("Verifying employee QR...");
-
-    try {
-      const response =
-        await startAttendanceScan({
-          qrValue: finalQrValue,
-        });
-
-      const data = response.data;
-
-      setAttempt(data);
-
-      /*
-       * Backend returns the real TTL.
-       *
-       * Current backend default = 60 seconds.
-       */
-      setRemainingSeconds(
-        data.expiresInSeconds ?? 60
-      );
-
-      setMessage("");
-
-      /*
-       * Move directly to photo step.
-       */
-      setStep(3);
-    } catch (err) {
-      console.error(
-        "Attendance scan failed:",
-        err
-      );
-
-      setMessage("");
-
-      setError(
-        getErrorMessage(err)
-      );
-
-      scanLockedRef.current = false;
-
-      /*
-       * Restart scanner after backend rejects QR.
-       */
-      setTimeout(() => {
-        startQrScanner();
-      }, 500);
-    }
-  };
+        /*
+         * Do NOT automatically restart
+         * the camera.
+         *
+         * Let the user click
+         * "Start QR Scanner".
+         */
+      }
+    };
 
 
-  /*
-   * ---------------------------------------------------------
-   * QR TIMER
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     COUNTDOWN
+     ========================================================= */
 
   useEffect(() => {
-    if (!attempt || remainingSeconds === null) {
+    if (
+      !attempt ||
+      remainingSeconds === null
+    ) {
       return;
     }
 
-    if (remainingSeconds <= 0) {
+    if (
+      remainingSeconds <= 0
+    ) {
       setError(
-        "The attendance attempt has expired. Please scan the QR code again."
+        "The attendance attempt has expired. Please scan the employee QR code again."
       );
 
-      stopCamera();
-
-      setStep(1);
+      stopPhotoCamera();
 
       setAttempt(null);
 
+      setQrValue("");
+
       setPhotoId("");
 
+      setPhotoPreview("");
+
       setLocation(null);
+
+      setRemainingSeconds(null);
+
+      setStep(1);
 
       return;
     }
 
-    const timer = setInterval(() => {
-      setRemainingSeconds(
-        (current) =>
-          current > 0
-            ? current - 1
-            : 0
-      );
-    }, 1000);
+    const timer =
+      window.setInterval(() => {
+        setRemainingSeconds(
+          (current) => {
+            if (
+              current === null
+            ) {
+              return null;
+            }
+
+            return current > 0
+              ? current - 1
+              : 0;
+          }
+        );
+      }, 1000);
 
     return () => {
-      clearInterval(timer);
+      window.clearInterval(
+        timer
+      );
     };
   }, [
     attempt,
@@ -330,324 +610,556 @@ function Attendance() {
   ]);
 
 
-  /*
-   * ---------------------------------------------------------
-   * PHOTO CAMERA
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     START PHOTO CAMERA
+     ========================================================= */
 
-  const startPhotoCamera = async () => {
-    setError("");
-    setMessage("");
-
-    try {
-      if (
-        !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
-      ) {
-        throw new Error(
-          "Camera is not supported by this browser."
-        );
+  const startPhotoCamera =
+    async () => {
+      if (cameraStarting) {
+        return;
       }
 
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: {
-              ideal: "user",
-            },
+      setError("");
+      setMessage("");
 
-            width: {
-              ideal: 1280,
-            },
+      setCameraStarting(true);
 
-            height: {
-              ideal: 720,
-            },
-          },
+      try {
+        stopPhotoCamera();
 
-          audio: false,
-        });
-
-      photoStreamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject =
-          stream;
-
-        await videoRef.current.play();
-      }
-
-      setCameraRunning(true);
-    } catch (err) {
-      console.error(
-        "Photo camera error:",
-        err
-      );
-
-      setError(
-        "Unable to open camera. Please allow camera permission."
-      );
-    }
-  };
-
-
-  /*
-   * ---------------------------------------------------------
-   * STOP PHOTO CAMERA
-   * ---------------------------------------------------------
-   */
-
-  const stopCamera = () => {
-    if (photoStreamRef.current) {
-      photoStreamRef.current
-        .getTracks()
-        .forEach((track) => {
-          track.stop();
-        });
-    }
-
-    photoStreamRef.current = null;
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    setCameraRunning(false);
-  };
-
-
-  /*
-   * ---------------------------------------------------------
-   * CAPTURE PHOTO
-   * ---------------------------------------------------------
-   */
-
-  const capturePhoto = async () => {
-    if (!videoRef.current) {
-      setError(
-        "Camera is not ready."
-      );
-
-      return;
-    }
-
-    const video = videoRef.current;
-
-    const canvas = canvasRef.current;
-
-    if (!canvas) {
-      setError(
-        "Unable to capture photo."
-      );
-
-      return;
-    }
-
-    if (
-      video.videoWidth === 0 ||
-      video.videoHeight === 0
-    ) {
-      setError(
-        "Camera is not ready yet. Please try again."
-      );
-
-      return;
-    }
-
-    canvas.width = video.videoWidth;
-
-    canvas.height = video.videoHeight;
-
-    const context =
-      canvas.getContext("2d");
-
-    context.drawImage(
-      video,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    canvas.toBlob(
-      async (blob) => {
-        if (!blob) {
-          setError(
-            "Unable to create photo."
+        if (
+          !navigator.mediaDevices ||
+          !navigator.mediaDevices
+            .getUserMedia
+        ) {
+          throw new Error(
+            "Camera access is not supported by this browser."
           );
-
-          return;
         }
 
-        const previewUrl =
-          URL.createObjectURL(blob);
+        /*
+         * Front/user-facing camera.
+         */
+        const stream =
+          await navigator.mediaDevices.getUserMedia(
+            {
+              audio: false,
 
-        setPhotoPreview(
-          previewUrl
-        );
+              video: {
+                facingMode: {
+                  ideal: "user",
+                },
 
-        stopCamera();
+                width: {
+                  ideal: 1280,
+                },
 
-        await uploadPhoto(blob);
-      },
-      "image/jpeg",
-      0.9
-    );
-  };
+                height: {
+                  ideal: 720,
+                },
+              },
+            }
+          );
 
+        photoStreamRef.current =
+          stream;
 
-  /*
-   * ---------------------------------------------------------
-   * UPLOAD PHOTO TO MEDIA SERVICE
-   * ---------------------------------------------------------
-   */
+        const video =
+          photoVideoRef.current;
 
-  const uploadPhoto = async (blob) => {
-    if (!attempt) {
-      setError(
-        "Attendance attempt is missing."
-      );
+        if (!video) {
+          throw new Error(
+            "Photo camera element is not ready."
+          );
+        }
 
-      return;
-    }
+        video.srcObject =
+          stream;
 
-    setUploadingPhoto(true);
+        video.muted = true;
 
-    setError("");
+        video.playsInline = true;
 
-    try {
-      const formData =
-        new FormData();
+        await video.play();
 
-      formData.append(
-        "attemptId",
-        attempt.attemptId
-      );
+        setCameraRunning(true);
 
-      formData.append(
-        "completionToken",
-        attempt.completionToken
-      );
-
-      formData.append(
-        "photo",
-        blob,
-        `attendance-${Date.now()}.jpg`
-      );
-
-      const response =
-        await api.post(
-          "/api/media/employee/attendance-photo",
-          formData,
-          {
-            headers: {
-              "Content-Type":
-                "multipart/form-data",
-            },
-          }
-        );
-
-      const media =
-        response.data;
-
-      setPhotoId(
-        media.mediaId
-      );
-
-      setUploadingPhoto(false);
-
-      setMessage(
-        "Photo captured successfully."
-      );
-
-      /*
-       * Photo done -> location.
-       */
-      setStep(4);
-    } catch (err) {
-      console.error(
-        "Photo upload failed:",
-        err
-      );
-
-      setUploadingPhoto(false);
-
-      setError(
-        getErrorMessage(err)
-      );
-    }
-  };
-
-
-  /*
-   * ---------------------------------------------------------
-   * LOCATION
-   * ---------------------------------------------------------
-   */
-
-  const getLocation = () => {
-    setError("");
-    setMessage("");
-
-    if (!navigator.geolocation) {
-      setError(
-        "Geolocation is not supported by this browser."
-      );
-
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords =
-          position.coords;
-
-        setLocation({
-          latitude:
-            coords.latitude,
-
-          longitude:
-            coords.longitude,
-
-          accuracy:
-            coords.accuracy,
-        });
-
-        setStep(5);
-
-        setMessage(
-          "Location verified successfully."
-        );
-      },
-
-      (err) => {
+        setCameraStarting(false);
+      } catch (err) {
         console.error(
-          "Location error:",
+          "Photo camera error:",
           err
         );
 
+        stopPhotoCamera();
+
         setError(
-          "Location permission is required to complete attendance."
+          getCameraErrorMessage(
+            err
+          )
         );
-      },
 
-      {
-        enableHighAccuracy: true,
-
-        timeout: 15000,
-
-        maximumAge: 0,
+        setCameraStarting(false);
       }
-    );
-  };
+    };
 
 
-  /*
-   * ---------------------------------------------------------
-   * COMPLETE ATTENDANCE
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     STOP PHOTO CAMERA
+     ========================================================= */
+
+  const stopPhotoCamera =
+    () => {
+      try {
+        if (
+          photoStreamRef.current
+        ) {
+          photoStreamRef.current
+            .getTracks()
+            .forEach(
+              (track) => {
+                track.stop();
+              }
+            );
+        }
+      } catch (err) {
+        console.warn(
+          "Unable to stop photo camera:",
+          err
+        );
+      }
+
+      photoStreamRef.current =
+        null;
+
+      if (
+        photoVideoRef.current
+      ) {
+        const video =
+          photoVideoRef.current;
+
+        video.pause();
+
+        video.srcObject = null;
+      }
+
+      setCameraRunning(false);
+      setCameraStarting(false);
+    };
+
+
+  /* =========================================================
+     CAPTURE PHOTO
+     ========================================================= */
+
+  const capturePhoto =
+    async () => {
+      if (!cameraRunning) {
+        setError(
+          "Please start the camera first."
+        );
+
+        return;
+      }
+
+      const video =
+        photoVideoRef.current;
+
+      const canvas =
+        canvasRef.current;
+
+      if (!video || !canvas) {
+        setError(
+          "Camera is not ready."
+        );
+
+        return;
+      }
+
+      if (
+        video.readyState <
+        HTMLMediaElement.HAVE_CURRENT_DATA
+      ) {
+        setError(
+          "Camera is still starting. Please wait a moment and try again."
+        );
+
+        return;
+      }
+
+      if (
+        video.videoWidth === 0 ||
+        video.videoHeight === 0
+      ) {
+        setError(
+          "Camera image is not available yet. Please try again."
+        );
+
+        return;
+      }
+
+      setError("");
+
+      canvas.width =
+        video.videoWidth;
+
+      canvas.height =
+        video.videoHeight;
+
+      const context =
+        canvas.getContext(
+          "2d"
+        );
+
+      if (!context) {
+        setError(
+          "Unable to prepare photo capture."
+        );
+
+        return;
+      }
+
+      /*
+       * Since the preview is mirrored,
+       * mirror the captured image as well.
+       */
+      context.save();
+
+      context.translate(
+        canvas.width,
+        0
+      );
+
+      context.scale(-1, 1);
+
+      context.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      context.restore();
+
+      canvas.toBlob(
+        async (blob) => {
+          if (!blob) {
+            setError(
+              "Unable to create photo."
+            );
+
+            return;
+          }
+
+          const previewUrl =
+            URL.createObjectURL(
+              blob
+            );
+
+          if (photoPreview) {
+            URL.revokeObjectURL(
+              photoPreview
+            );
+          }
+
+          setPhotoPreview(
+            previewUrl
+          );
+
+          stopPhotoCamera();
+
+          await uploadPhoto(
+            blob
+          );
+        },
+        "image/jpeg",
+        0.9
+      );
+    };
+
+
+  /* =========================================================
+     UPLOAD PHOTO
+     ========================================================= */
+
+  const uploadPhoto =
+    async (blob) => {
+      if (!attempt) {
+        setError(
+          "Attendance attempt is missing."
+        );
+
+        return;
+      }
+
+      if (
+        !attempt.attemptId
+      ) {
+        setError(
+          "Attendance attempt ID is missing."
+        );
+
+        return;
+      }
+
+      if (
+        !attempt.completionToken
+      ) {
+        setError(
+          "Attendance completion token is missing."
+        );
+
+        return;
+      }
+
+      setUploadingPhoto(true);
+
+      setError("");
+
+      setMessage(
+        "Uploading attendance photo..."
+      );
+
+      try {
+        const formData =
+          new FormData();
+
+        formData.append(
+          "attemptId",
+          attempt.attemptId
+        );
+
+        formData.append(
+          "completionToken",
+          attempt.completionToken
+        );
+
+        formData.append(
+          "photo",
+          blob,
+          `attendance-${Date.now()}.jpg`
+        );
+
+        /*
+         * IMPORTANT:
+         *
+         * Do not manually set Content-Type.
+         *
+         * Axios/browser will add the correct
+         * multipart boundary automatically.
+         */
+        const response =
+          await api.post(
+            "/api/media/employee/attendance-photo",
+            formData
+          );
+
+        console.log(
+          "Photo upload response:",
+          response.data
+        );
+
+        const media =
+          response.data || {};
+
+        const returnedPhotoId =
+          media.mediaId ||
+          media.id ||
+          media.photoId;
+
+        if (!returnedPhotoId) {
+          throw new Error(
+            "Photo upload succeeded but media ID was not returned by the media service."
+          );
+        }
+
+        setPhotoId(
+          returnedPhotoId
+        );
+
+        setUploadingPhoto(
+          false
+        );
+
+        setMessage(
+          "Photo captured successfully."
+        );
+
+        /*
+         * If location is not required,
+         * go directly to completion.
+         */
+        if (
+          attempt.locationRequired ===
+          false
+        ) {
+          setStep(5);
+        } else {
+          setStep(4);
+        }
+      } catch (err) {
+        console.error(
+          "Photo upload failed:",
+          err
+        );
+
+        setUploadingPhoto(
+          false
+        );
+
+        setMessage("");
+
+        setError(
+          getErrorMessage(err)
+        );
+      }
+    };
+
+
+  /* =========================================================
+     RETAKE PHOTO
+     ========================================================= */
+
+  const retakePhoto =
+    () => {
+      if (photoPreview) {
+        URL.revokeObjectURL(
+          photoPreview
+        );
+      }
+
+      setPhotoPreview("");
+
+      setPhotoId("");
+
+      setMessage("");
+
+      setError("");
+
+      startPhotoCamera();
+    };
+
+
+  /* =========================================================
+     GET LOCATION
+     ========================================================= */
+
+  const getLocation =
+    () => {
+      setError("");
+
+      setMessage("");
+
+      if (!navigator.geolocation) {
+        setError(
+          "Geolocation is not supported by this browser."
+        );
+
+        return;
+      }
+
+      setLocationLoading(
+        true
+      );
+
+      setMessage(
+        "Getting your current location..."
+      );
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords =
+            position.coords;
+
+          const nextLocation =
+            {
+              latitude:
+                coords.latitude,
+
+              longitude:
+                coords.longitude,
+
+              accuracy:
+                coords.accuracy,
+            };
+
+          console.log(
+            "Attendance location:",
+            nextLocation
+          );
+
+          setLocation(
+            nextLocation
+          );
+
+          setLocationLoading(
+            false
+          );
+
+          setMessage(
+            "Location verified successfully."
+          );
+
+          setStep(5);
+        },
+
+        (err) => {
+          console.error(
+            "Location error:",
+            err
+          );
+
+          setLocationLoading(
+            false
+          );
+
+          setMessage("");
+
+          if (
+            err.code ===
+            1
+          ) {
+            setError(
+              "Location permission was denied. Please allow location access for localhost and try again."
+            );
+          } else if (
+            err.code ===
+            2
+          ) {
+            setError(
+              "Your current location could not be determined. Please try again."
+            );
+          } else if (
+            err.code ===
+            3
+          ) {
+            setError(
+              "Location request timed out. Please try again."
+            );
+          } else {
+            setError(
+              "Unable to get your current location."
+            );
+          }
+        },
+
+        {
+          enableHighAccuracy:
+            true,
+
+          timeout: 15000,
+
+          maximumAge: 0,
+        }
+      );
+    };
+
+
+  /* =========================================================
+     COMPLETE ATTENDANCE
+     ========================================================= */
 
   const completeAttendance =
     async () => {
@@ -659,7 +1171,11 @@ function Attendance() {
         return;
       }
 
-      if (!photoId) {
+      if (
+        attempt.photoRequired !==
+          false &&
+        !photoId
+      ) {
         setError(
           "Attendance photo is missing."
         );
@@ -667,7 +1183,11 @@ function Attendance() {
         return;
       }
 
-      if (!location) {
+      if (
+        attempt.locationRequired !==
+          false &&
+        !location
+      ) {
         setError(
           "Attendance location is missing."
         );
@@ -679,38 +1199,64 @@ function Attendance() {
 
       setError("");
 
+      setMessage(
+        "Completing attendance..."
+      );
+
       try {
-        await completeAttendanceScan({
+        const payload = {
           attemptId:
             attempt.attemptId,
 
           completionToken:
             attempt.completionToken,
 
-          photoId,
-
-          latitude:
-            location.latitude,
-
-          longitude:
-            location.longitude,
-
-          accuracyMeters:
-            location.accuracy,
-
           clientCapturedAt:
             new Date().toISOString(),
-        });
+        };
+
+        /*
+         * Add photo only when we have one.
+         */
+        if (photoId) {
+          payload.photoId =
+            photoId;
+        }
+
+        /*
+         * Add location only when available.
+         */
+        if (location) {
+          payload.latitude =
+            location.latitude;
+
+          payload.longitude =
+            location.longitude;
+
+          payload.accuracyMeters =
+            location.accuracy;
+        }
+
+        console.log(
+          "Completing attendance:",
+          payload
+        );
+
+        await completeAttendanceScan(
+          payload
+        );
 
         setCompleting(false);
 
-        setStep(6);
-
-        setRemainingSeconds(null);
+        setRemainingSeconds(
+          null
+        );
 
         setMessage(
           "Attendance completed successfully."
         );
+
+        setStep(6);
       } catch (err) {
         console.error(
           "Attendance completion failed:",
@@ -719,6 +1265,8 @@ function Attendance() {
 
         setCompleting(false);
 
+        setMessage("");
+
         setError(
           getErrorMessage(err)
         );
@@ -726,85 +1274,64 @@ function Attendance() {
     };
 
 
-  /*
-   * ---------------------------------------------------------
-   * RESET
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     RESET FLOW
+     ========================================================= */
 
-  const resetFlow = async () => {
-    await stopQrScanner();
+  const resetFlow =
+    async () => {
+      stopQrScanner();
 
-    stopCamera();
+      stopPhotoCamera();
 
-    if (photoPreview) {
-      URL.revokeObjectURL(
-        photoPreview
+      if (photoPreview) {
+        URL.revokeObjectURL(
+          photoPreview
+        );
+      }
+
+      qrLockedRef.current =
+        false;
+
+      setStep(1);
+
+      setQrValue("");
+
+      setAttempt(null);
+
+      setRemainingSeconds(
+        null
       );
-    }
 
-    setStep(1);
+      setPhotoId("");
 
-    setQrValue("");
+      setPhotoPreview("");
 
-    setAttempt(null);
+      setLocation(null);
 
-    setPhotoId("");
+      setMessage("");
 
-    setPhotoPreview("");
+      setError("");
 
-    setLocation(null);
+      setScannerRunning(
+        false
+      );
 
-    setMessage("");
-
-    setError("");
-
-    setRemainingSeconds(null);
-
-    scanLockedRef.current = false;
-  };
-
-
-  /*
-   * ---------------------------------------------------------
-   * START QR CAMERA WHEN STEP 1
-   * ---------------------------------------------------------
-   */
-
-  useEffect(() => {
-    if (step !== 1) {
-      stopQrScanner();
-
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      startQrScanner();
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-
-      stopQrScanner();
+      setCameraRunning(
+        false
+      );
     };
-  }, [
-    step,
-    startQrScanner,
-    stopQrScanner,
-  ]);
 
 
-  /*
-   * ---------------------------------------------------------
-   * CLEANUP
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     CLEANUP
+     ========================================================= */
 
   useEffect(() => {
     return () => {
       stopQrScanner();
 
-      stopCamera();
+      stopPhotoCamera();
 
       if (photoPreview) {
         URL.revokeObjectURL(
@@ -812,111 +1339,127 @@ function Attendance() {
         );
       }
     };
-  }, []);
+  }, [
+    stopQrScanner,
+  ]);
 
 
-  /*
-   * ---------------------------------------------------------
-   * TIMER DISPLAY
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     STEP DATA
+     ========================================================= */
 
-  const formatTime = (seconds) => {
-    if (seconds === null) {
-      return "--:--";
-    }
+  const steps = [
+    {
+      number: 1,
+      label: "Scan QR",
+    },
+    {
+      number: 2,
+      label: "Verify",
+    },
+    {
+      number: 3,
+      label: "Photo",
+    },
+    {
+      number: 4,
+      label: "Location",
+    },
+    {
+      number: 5,
+      label: "Complete",
+    },
+  ];
 
-    const mins =
-      Math.floor(seconds / 60);
 
-    const secs =
-      seconds % 60;
+  /* =========================================================
+     FLOW STEP STATUS
+     ========================================================= */
 
-    return `${String(mins).padStart(
-      2,
-      "0"
-    )}:${String(secs).padStart(
-      2,
-      "0"
-    )}`;
-  };
+  const getStepClass =
+    (number) => {
+      if (step === 6) {
+        return "done";
+      }
+
+      if (number < step) {
+        return "done";
+      }
+
+      if (number === step) {
+        return "current";
+      }
+
+      return "";
+    };
 
 
-  /*
-   * ---------------------------------------------------------
-   * UI
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     RENDER
+     ========================================================= */
 
   return (
-    <div>
+    <div className="attendance-page">
+
       <PageHeader
         eyebrow="ATTENDANCE"
         title="Mark attendance"
         description="Scan your employee QR, capture a live photo and verify your location."
       />
 
-      {/* STEP INDICATOR */}
 
-      <div className="flow-steps">
-        {[
-          "Scan QR",
-          "Verify",
-          "Photo",
-          "Location",
-          "Complete",
-        ].map(
-          (label, index) => {
-            const number =
-              index + 1;
+      {/* =====================================================
+          FLOW
+          ===================================================== */}
 
-            const displayNumber =
-              number === 5
-                ? 5
-                : number;
+      <div className="attendance-flow">
 
-            const status =
-              step === number
-                ? "active"
-                : step > number
-                ? "done"
-                : "";
-
-            return (
-              <div
-                className={`flow-step ${status}`}
-                key={label}
-              >
-                <span>
-                  {step > number ? (
-                    <CheckCircle2
-                      size={15}
-                    />
-                  ) : (
-                    displayNumber
-                  )}
-                </span>
-
-                {label}
+        {steps.map(
+          (item) => (
+            <div
+              key={item.number}
+              className={`attendance-flow-step ${getStepClass(
+                item.number
+              )}`}
+            >
+              <div className="attendance-flow-number">
+                {item.number}
               </div>
-            );
-          }
+
+              <span>
+                {item.label}
+              </span>
+            </div>
+          )
         )}
+
       </div>
 
 
-      <section className="panel scanner-panel">
+      {/* =====================================================
+          MAIN PANEL
+          ===================================================== */}
 
-        {/* =========================================
-            STEP 1 — QR SCANNER
-        ========================================== */}
+      <div className="attendance-panel">
+
+
+        {/* ===================================================
+            STEP 1 — QR
+            =================================================== */}
 
         {step === 1 && (
-          <div className="attendance-step">
+          <div className="attendance-card">
 
-            <div className="scanner-header">
+            <div className="attendance-card-header">
+
+              <div className="attendance-icon blue">
+                <QrCode
+                  size={24}
+                />
+              </div>
+
               <div>
-                <div className="eyebrow">
+                <div className="attendance-eyebrow">
                   STEP 1
                 </div>
 
@@ -925,30 +1468,51 @@ function Attendance() {
                 </h2>
 
                 <p>
-                  Position the employee QR
-                  code inside the scanning
-                  frame.
+                  Position the employee QR code inside the scanning frame.
                 </p>
               </div>
 
-              <QrCode
-                size={32}
-              />
             </div>
 
 
-            <div className="attendance-qr-scanner">
+            {/* QR CAMERA */}
 
-              <div
-                id="attendance-qr-reader"
-                className="qr-reader"
+            <div className="qr-scanner-wrapper">
+
+              <video
+                ref={
+                  qrVideoRef
+                }
+                className="attendance-qr-video"
+                muted
+                playsInline
               />
 
-              {!scannerRunning && (
-                <div className="scanner-overlay">
+              {!scannerRunning &&
+                !scannerStarting && (
+                  <div className="scanner-empty">
+
+                    <QrCode
+                      size={52}
+                    />
+
+                    <strong>
+                      Camera is ready
+                    </strong>
+
+                    <span>
+                      Click the button below to start QR scanning.
+                    </span>
+
+                  </div>
+                )}
+
+
+              {scannerStarting && (
+                <div className="scanner-loading">
 
                   <ScanLine
-                    size={52}
+                    size={42}
                   />
 
                   <strong>
@@ -956,9 +1520,22 @@ function Attendance() {
                   </strong>
 
                   <span>
-                    Please allow camera
-                    access.
+                    Please allow camera access.
                   </span>
+
+                </div>
+              )}
+
+
+              {scannerRunning && (
+                <div className="qr-frame">
+
+                  <div className="qr-corner top-left" />
+                  <div className="qr-corner top-right" />
+                  <div className="qr-corner bottom-left" />
+                  <div className="qr-corner bottom-right" />
+
+                  <div className="qr-scan-line" />
 
                 </div>
               )}
@@ -966,679 +1543,835 @@ function Attendance() {
             </div>
 
 
-            <div className="scanner-status">
+            {/* QR STATUS */}
 
-              <span
-                className={
-                  scannerRunning
-                    ? "status-dot online"
-                    : "status-dot"
-                }
-              />
+            {scannerRunning && (
+              <div className="attendance-info">
 
-              {scannerRunning
-                ? "Camera active — scanning for QR code"
-                : "Camera starting..."}
-
-            </div>
-
-
-            <div className="scanner-divider">
-              <span>
-                OR
-              </span>
-            </div>
-
-
-            <div className="form-field">
-
-              <label>
-                QR value
-                <small>
-                  Optional testing fallback
-                </small>
-              </label>
-
-              <div className="input-wrapper">
-
-                <QrCode
-                  size={18}
+                <ScanLine
+                  size={16}
                 />
 
+                <span>
+                  Scanning for employee QR...
+                </span>
+
+              </div>
+            )}
+
+
+            {/* BUTTONS */}
+
+            <div className="attendance-actions">
+
+              {!scannerRunning &&
+                !scannerStarting && (
+                  <button
+                    type="button"
+                    className="attendance-btn primary full"
+                    onClick={
+                      startQrScanner
+                    }
+                  >
+                    <Play
+                      size={17}
+                    />
+
+                    Start QR Scanner
+                  </button>
+                )}
+
+
+              {scannerStarting && (
+                <button
+                  type="button"
+                  className="attendance-btn secondary full"
+                  disabled
+                >
+                  Starting camera...
+                </button>
+              )}
+
+
+              {scannerRunning && (
+                <button
+                  type="button"
+                  className="attendance-btn secondary full"
+                  onClick={
+                    stopQrScanner
+                  }
+                >
+                  <Square
+                    size={16}
+                  />
+
+                  Stop Scanner
+                </button>
+              )}
+
+            </div>
+
+
+            {/* OPTIONAL TEST INPUT */}
+
+            <details className="attendance-test">
+
+              <summary>
+                Testing fallback
+              </summary>
+
+              <div className="attendance-test-body">
+
+                <label>
+                  QR value
+                </label>
+
                 <input
+                  type="text"
                   value={qrValue}
                   onChange={(event) =>
                     setQrValue(
-                      event.target.value
+                      event.target
+                        .value
                     )
                   }
                   placeholder="Paste QR value only for testing"
                 />
 
+                <button
+                  type="button"
+                  className="attendance-btn secondary"
+                  onClick={() =>
+                    handleQrSubmit(
+                      qrValue
+                    )
+                  }
+                  disabled={
+                    !qrValue.trim()
+                  }
+                >
+                  Verify QR
+                </button>
+
               </div>
 
-            </div>
-
-
-            <button
-              className="primary-btn full"
-              onClick={() =>
-                handleQrSubmit()
-              }
-            >
-              Verify QR
-
-              <QrCode
-                size={17}
-              />
-            </button>
-
-
-            {error && (
-              <div className="error-box">
-                <XCircle
-                  size={18}
-                />
-
-                <span>
-                  {error}
-                </span>
-              </div>
-            )}
+            </details>
 
           </div>
         )}
 
 
-        {/* =========================================
-            STEP 2 — VERIFIED
-        ========================================== */}
-
-        {step === 2 && (
-          <div className="verify-card">
-
-            <div className="success-icon">
-              <ShieldCheck />
-            </div>
-
-            <div className="eyebrow">
-              EMPLOYEE VERIFIED
-            </div>
-
-            <h2>
-              Employee verified
-            </h2>
-
-            <p>
-              The employee QR code has
-              been successfully validated.
-            </p>
-
-
-            {attempt && (
-              <div className="verify-grid">
-
-                <div>
-                  <span>
-                    Employee
-                  </span>
-
-                  <strong>
-                    {attempt.employeeName ||
-                      "Employee"}
-                  </strong>
-                </div>
-
-
-                <div>
-                  <span>
-                    Employee Code
-                  </span>
-
-                  <strong>
-                    {attempt.employeeCode ||
-                      "-"}
-                  </strong>
-                </div>
-
-
-                <div>
-                  <span>
-                    Shift
-                  </span>
-
-                  <strong>
-                    {attempt.shiftName ||
-                      "-"}
-                  </strong>
-                </div>
-
-
-                <div>
-                  <span>
-                    Action
-                  </span>
-
-                  <strong>
-                    {attempt.action ||
-                      "-"}
-                  </strong>
-                </div>
-
-              </div>
-            )}
-
-
-            <button
-              className="primary-btn full"
-              onClick={() =>
-                setStep(3)
-              }
-            >
-              Continue
-
-              <Camera
-                size={17}
-              />
-            </button>
-
-          </div>
-        )}
-
-
-        {/* =========================================
+        {/* ===================================================
             STEP 3 — PHOTO
-        ========================================== */}
+            =================================================== */}
 
         {step === 3 && (
-          <div className="attendance-step">
+          <div className="attendance-card">
 
-            <div className="attendance-step-top">
+            <div className="attendance-card-header">
+
+              <div className="attendance-icon purple">
+                <Camera
+                  size={24}
+                />
+              </div>
 
               <div>
-                <div className="eyebrow">
-                  STEP 3 — LIVE PHOTO
+                <div className="attendance-eyebrow">
+                  STEP 3
                 </div>
 
                 <h2>
-                  Capture attendance photo
+                  Capture live photo
                 </h2>
 
                 <p>
-                  Take a live photo before
-                  the attendance attempt
-                  expires.
+                  Take a live photo to verify that you are the employee marking attendance.
                 </p>
               </div>
 
-
-              {remainingSeconds !== null && (
-                <div
-                  className={`attempt-timer ${
-                    remainingSeconds <= 10
-                      ? "danger"
-                      : ""
-                  }`}
-                >
-                  <Clock3
-                    size={17}
-                  />
-
-                  {formatTime(
-                    remainingSeconds
-                  )}
-                </div>
-              )}
-
             </div>
 
 
-            <div className="photo-camera">
+            {/* COUNTDOWN */}
 
-              {cameraRunning ? (
-                <video
-                  ref={videoRef}
-                  className="camera-video"
-                  autoPlay
-                  playsInline
-                  muted
-                />
-              ) : photoPreview ? (
-                <img
-                  src={photoPreview}
-                  className="camera-video"
-                  alt="Captured attendance"
-                />
-              ) : (
-                <div className="camera-placeholder">
-
-                  <Camera
-                    size={52}
-                  />
-
-                  <strong>
-                    Camera ready
-                  </strong>
-
-                  <span>
-                    Click start camera
-                    to continue.
-                  </span>
-
-                </div>
-              )}
-
-              <div className="camera-frame-overlay" />
-
-            </div>
-
-
-            <canvas
-              ref={canvasRef}
-              style={{
-                display: "none",
-              }}
-            />
-
-
-            {!cameraRunning &&
-              !photoPreview && (
-                <button
-                  className="primary-btn full"
-                  onClick={
-                    startPhotoCamera
-                  }
-                >
-                  Start camera
-
-                  <Camera
-                    size={17}
-                  />
-                </button>
-              )}
-
-
-            {cameraRunning && (
-              <button
-                className="primary-btn full"
-                onClick={
-                  capturePhoto
-                }
-                disabled={
-                  uploadingPhoto
-                }
-              >
-                {uploadingPhoto
-                  ? "Uploading..."
-                  : "Capture photo"}
-
-                <Camera
-                  size={17}
-                />
-              </button>
-            )}
-
-
-            {photoPreview &&
-              !uploadingPhoto &&
-              !photoId && (
-                <button
-                  className="secondary-btn full"
-                  onClick={() => {
-                    setPhotoPreview(
-                      ""
-                    );
-
-                    startPhotoCamera();
-                  }}
-                >
-                  <RotateCcw
-                    size={17}
-                  />
-
-                  Retake photo
-                </button>
-              )}
-
-
-            {uploadingPhoto && (
-              <div className="info-box">
-                <Upload
-                  size={18}
-                />
-
-                Uploading photo securely...
-              </div>
-            )}
-
-
-            {photoId && (
-              <div className="success-box">
-                <CheckCircle2
-                  size={18}
-                />
-
-                Photo uploaded successfully.
-              </div>
-            )}
-
-
-            {error && (
-              <div className="error-box">
-                <XCircle
-                  size={18}
-                />
-
-                <span>
-                  {error}
-                </span>
-              </div>
-            )}
-
-          </div>
-        )}
-
-
-        {/* =========================================
-            STEP 4 — LOCATION
-        ========================================== */}
-
-        {step === 4 && (
-          <div className="verify-card">
-
-            <div className="location-icon">
-              <MapPin />
-            </div>
-
-            <div className="eyebrow">
-              STEP 4 — LOCATION
-            </div>
-
-            <h2>
-              Verify your location
-            </h2>
-
-            <p>
-              Allow location access so
-              the backend can verify where
-              the attendance was recorded.
-            </p>
-
-
-            {remainingSeconds !== null && (
+            {remainingSeconds !==
+              null && (
               <div
-                className={`attempt-timer ${
-                  remainingSeconds <= 10
+                className={`attendance-countdown ${
+                  remainingSeconds <=
+                  15
                     ? "danger"
                     : ""
                 }`}
               >
+
                 <Clock3
-                  size={17}
-                />
-
-                Attempt expires in{" "}
-                {formatTime(
-                  remainingSeconds
-                )}
-              </div>
-            )}
-
-
-            <button
-              className="primary-btn full"
-              onClick={
-                getLocation
-              }
-            >
-              <Crosshair
-                size={17}
-              />
-
-              Get current location
-            </button>
-
-
-            {error && (
-              <div className="error-box">
-                <XCircle
-                  size={18}
+                  size={16}
                 />
 
                 <span>
-                  {error}
+                  Attendance attempt expires in{" "}
+                  <strong>
+                    {remainingSeconds}s
+                  </strong>
                 </span>
+
               </div>
             )}
+
+
+            {/* CAMERA */}
+
+            <div className="attendance-camera">
+
+              <video
+                ref={
+                  photoVideoRef
+                }
+                className="attendance-camera-video"
+                muted
+                playsInline
+              />
+
+
+              {!cameraRunning &&
+                !photoPreview && (
+                  <div className="camera-overlay">
+
+                    <UserRound
+                      size={48}
+                    />
+
+                    <strong>
+                      Camera is not running
+                    </strong>
+
+                    <span>
+                      Start the camera to capture your photo.
+                    </span>
+
+                  </div>
+                )}
+
+
+              {cameraRunning && (
+                <div className="camera-face-guide">
+
+                  <div className="face-oval" />
+
+                  <span>
+                    Position your face inside the frame
+                  </span>
+
+                </div>
+              )}
+
+            </div>
+
+
+            {/* PREVIEW */}
+
+            {photoPreview && (
+              <div className="attendance-photo-preview">
+
+                <img
+                  src={
+                    photoPreview
+                  }
+                  alt="Attendance preview"
+                />
+
+              </div>
+            )}
+
+
+            {/* PHOTO STATUS */}
+
+            {uploadingPhoto && (
+              <div className="attendance-info">
+
+                <Upload
+                  size={16}
+                />
+
+                <span>
+                  Uploading photo...
+                </span>
+
+              </div>
+            )}
+
+
+            {/* ACTIONS */}
+
+            <div className="attendance-actions">
+
+              {!cameraRunning &&
+                !photoPreview &&
+                !uploadingPhoto && (
+                  <button
+                    type="button"
+                    className="attendance-btn primary"
+                    onClick={
+                      startPhotoCamera
+                    }
+                  >
+                    <Camera
+                      size={17}
+                    />
+
+                    Start Camera
+                  </button>
+                )}
+
+
+              {cameraRunning && (
+                <>
+                  <button
+                    type="button"
+                    className="attendance-btn secondary"
+                    onClick={
+                      stopPhotoCamera
+                    }
+                  >
+                    <Square
+                      size={16}
+                    />
+
+                    Stop Camera
+                  </button>
+
+                  <button
+                    type="button"
+                    className="attendance-btn primary"
+                    onClick={
+                      capturePhoto
+                    }
+                  >
+                    <Camera
+                      size={17}
+                    />
+
+                    Capture Photo
+                  </button>
+                </>
+              )}
+
+
+              {photoPreview &&
+                !uploadingPhoto && (
+                  <>
+                    <button
+                      type="button"
+                      className="attendance-btn secondary"
+                      onClick={
+                        retakePhoto
+                      }
+                    >
+                      <RotateCcw
+                        size={16}
+                      />
+
+                      Retake
+                    </button>
+                  </>
+                )}
+
+            </div>
+
+
+            <div className="attendance-help">
+
+              <ShieldCheck
+                size={15}
+              />
+
+              <span>
+                Your photo is captured directly from your device camera.
+              </span>
+
+            </div>
 
           </div>
         )}
 
 
-        {/* =========================================
-            STEP 5 — REVIEW
-        ========================================== */}
+        {/* ===================================================
+            STEP 4 — LOCATION
+            =================================================== */}
 
-        {step === 5 && (
-          <div className="verify-card">
+        {step === 4 && (
+          <div className="attendance-card">
 
-            <div className="success-icon">
-              <CheckCircle2 />
+            <div className="attendance-card-header">
+
+              <div className="attendance-icon green">
+                <MapPin
+                  size={24}
+                />
+              </div>
+
+              <div>
+                <div className="attendance-eyebrow">
+                  STEP 4
+                </div>
+
+                <h2>
+                  Verify your location
+                </h2>
+
+                <p>
+                  Allow location access so the attendance service can verify where attendance was marked.
+                </p>
+              </div>
+
             </div>
 
-            <div className="eyebrow">
-              READY TO COMPLETE
-            </div>
 
-            <h2>
-              Attendance verification ready
-            </h2>
+            {remainingSeconds !==
+              null && (
+              <div
+                className={`attendance-countdown ${
+                  remainingSeconds <=
+                  15
+                    ? "danger"
+                    : ""
+                }`}
+              >
 
-            <p>
-              Review the verification
-              details and complete your
-              attendance.
-            </p>
-
-
-            <div className="verification-summary">
-
-              <div className="summary-row">
+                <Clock3
+                  size={16}
+                />
 
                 <span>
-                  QR verification
+                  Attendance attempt expires in{" "}
+                  <strong>
+                    {remainingSeconds}s
+                  </strong>
                 </span>
 
-                <strong>
-                  <CheckCircle2
-                    size={16}
-                  />
+              </div>
+            )}
 
-                  Verified
-                </strong>
+
+            <div className="location-verification">
+
+              <div className="location-icon">
+
+                <Crosshair
+                  size={42}
+                />
 
               </div>
 
+              <h3>
+                Get your current location
+              </h3>
 
-              <div className="summary-row">
-
-                <span>
-                  Live photo
-                </span>
-
-                <strong>
-                  <CheckCircle2
-                    size={16}
-                  />
-
-                  Uploaded
-                </strong>
-
-              </div>
-
-
-              <div className="summary-row">
-
-                <span>
-                  Location
-                </span>
-
-                <strong>
-                  <CheckCircle2
-                    size={16}
-                  />
-
-                  Verified
-                </strong>
-
-              </div>
+              <p>
+                Your browser will ask for location permission. Please select Allow.
+              </p>
 
             </div>
 
 
             {location && (
-              <div className="location-data">
+              <div className="attendance-location">
 
                 <MapPin
-                  size={15}
+                  size={22}
                 />
 
-                <span>
-                  {location.latitude.toFixed(
-                    6
-                  )}
+                <div>
 
-                  {" · "}
+                  <strong>
+                    Location captured
+                  </strong>
 
-                  {location.longitude.toFixed(
-                    6
-                  )}
+                  <span>
+                    Accuracy:{" "}
+                    {Math.round(
+                      location.accuracy
+                    )}{" "}
+                    meters
+                  </span>
 
-                  {" · ±"}
-
-                  {Math.round(
-                    location.accuracy
-                  )}
-
-                  m
-                </span>
+                </div>
 
               </div>
             )}
 
 
-            {remainingSeconds !== null && (
+            <div className="attendance-actions">
+
+              <button
+                type="button"
+                className="attendance-btn primary full"
+                onClick={
+                  getLocation
+                }
+                disabled={
+                  locationLoading
+                }
+              >
+
+                <MapPin
+                  size={17}
+                />
+
+                {locationLoading
+                  ? "Getting location..."
+                  : "Allow & Verify Location"}
+
+              </button>
+
+            </div>
+
+          </div>
+        )}
+
+
+        {/* ===================================================
+            STEP 5 — COMPLETE
+            =================================================== */}
+
+        {step === 5 && (
+          <div className="attendance-card">
+
+            <div className="attendance-card-header">
+
+              <div className="attendance-icon blue">
+                <ShieldCheck
+                  size={24}
+                />
+              </div>
+
+              <div>
+                <div className="attendance-eyebrow">
+                  STEP 5
+                </div>
+
+                <h2>
+                  Review attendance
+                </h2>
+
+                <p>
+                  All required verification information has been collected.
+                </p>
+              </div>
+
+            </div>
+
+
+            {remainingSeconds !==
+              null && (
               <div
-                className={`attempt-timer ${
-                  remainingSeconds <= 10
+                className={`attendance-countdown ${
+                  remainingSeconds <=
+                  15
                     ? "danger"
                     : ""
                 }`}
               >
+
                 <Clock3
-                  size={17}
+                  size={16}
                 />
 
-                {formatTime(
-                  remainingSeconds
-                )}
+                <span>
+                  Attendance attempt expires in{" "}
+                  <strong>
+                    {remainingSeconds}s
+                  </strong>
+                </span>
+
               </div>
             )}
 
 
-            <button
-              className="primary-btn full"
-              onClick={
-                completeAttendance
-              }
-              disabled={completing}
-            >
-              {completing
-                ? "Completing..."
-                : "Complete attendance"}
+            <div className="attendance-review">
+
+              <div className="review-item">
+
+                <div className="review-icon green">
+                  <QrCode
+                    size={18}
+                  />
+                </div>
+
+                <div>
+
+                  <span>
+                    Employee QR
+                  </span>
+
+                  <strong>
+                    Verified
+                  </strong>
+
+                </div>
+
+                <CheckCircle2
+                  size={20}
+                  className="review-check"
+                />
+
+              </div>
+
+
+              {photoId && (
+                <div className="review-item">
+
+                  <div className="review-icon purple">
+                    <Camera
+                      size={18}
+                    />
+                  </div>
+
+                  <div>
+
+                    <span>
+                      Live photo
+                    </span>
+
+                    <strong>
+                      Captured
+                    </strong>
+
+                  </div>
+
+                  <CheckCircle2
+                    size={20}
+                    className="review-check"
+                  />
+
+                </div>
+              )}
+
+
+              {location && (
+                <div className="review-item">
+
+                  <div className="review-icon green">
+                    <MapPin
+                      size={18}
+                    />
+                  </div>
+
+                  <div>
+
+                    <span>
+                      Location
+                    </span>
+
+                    <strong>
+                      Verified
+                    </strong>
+
+                  </div>
+
+                  <CheckCircle2
+                    size={20}
+                    className="review-check"
+                  />
+
+                </div>
+              )}
+
+            </div>
+
+
+            {photoPreview && (
+              <div className="attendance-photo-preview small">
+
+                <img
+                  src={
+                    photoPreview
+                  }
+                  alt="Captured attendance"
+                />
+
+              </div>
+            )}
+
+
+            <div className="attendance-actions">
+
+              <button
+                type="button"
+                className="attendance-btn secondary"
+                onClick={
+                  resetFlow
+                }
+                disabled={
+                  completing
+                }
+              >
+                <RotateCcw
+                  size={16}
+                />
+
+                Start Again
+              </button>
+
+              <button
+                type="button"
+                className="attendance-btn primary"
+                onClick={
+                  completeAttendance
+                }
+                disabled={
+                  completing
+                }
+              >
+
+                <CheckCircle2
+                  size={17}
+                />
+
+                {completing
+                  ? "Completing..."
+                  : "Mark Attendance"}
+
+              </button>
+
+            </div>
+
+          </div>
+        )}
+
+
+        {/* ===================================================
+            STEP 6 — SUCCESS
+            =================================================== */}
+
+        {step === 6 && (
+          <div className="attendance-card completed">
+
+            <div className="attendance-success-icon">
 
               <CheckCircle2
-                size={17}
+                size={42}
               />
-            </button>
+
+            </div>
+
+            <div className="attendance-eyebrow center">
+              ATTENDANCE RECORDED
+            </div>
+
+            <h2>
+              Attendance completed
+            </h2>
+
+            <p>
+              Your attendance has been successfully marked and verified.
+            </p>
 
 
-            {error && (
-              <div className="error-box">
-                <XCircle
+            <div className="success-summary">
+
+              <div>
+
+                <CheckCircle2
                   size={18}
                 />
 
                 <span>
-                  {error}
+                  QR verified
                 </span>
+
               </div>
-            )}
-
-          </div>
-        )}
 
 
-        {/* =========================================
-            STEP 6 — COMPLETE
-        ========================================== */}
+              {photoId && (
+                <div>
 
-        {step === 6 && (
-          <div className="verify-card">
+                  <CheckCircle2
+                    size={18}
+                  />
 
-            <div className="success-icon">
-              <CheckCircle2 />
-            </div>
+                  <span>
+                    Photo verified
+                  </span>
 
-            <div className="eyebrow">
-              ATTENDANCE COMPLETED
-            </div>
-
-            <h2>
-              Attendance marked successfully
-            </h2>
-
-            <p>
-              Your attendance has been
-              recorded successfully.
-            </p>
+                </div>
+              )}
 
 
-            <div className="success-box">
-              <CheckCircle2
-                size={18}
-              />
+              {location && (
+                <div>
 
-              Attendance recorded
-              successfully.
+                  <CheckCircle2
+                    size={18}
+                  />
+
+                  <span>
+                    Location verified
+                  </span>
+
+                </div>
+              )}
+
             </div>
 
 
             <button
-              className="primary-btn full"
+              type="button"
+              className="attendance-btn primary"
               onClick={
                 resetFlow
               }
             >
-              Mark another attendance
 
               <RotateCcw
                 size={17}
               />
+
+              Mark Another Attendance
+
             </button>
 
           </div>
         )}
 
 
-        {message &&
-          step !== 1 && (
-            <div className="info-box">
-              {message}
-            </div>
-          )}
+        {/* ===================================================
+            GLOBAL MESSAGE
+            =================================================== */}
 
-      </section>
+        {message && (
+          <div className="attendance-info">
+
+            <CheckCircle2
+              size={16}
+            />
+
+            <span>
+              {message}
+            </span>
+
+          </div>
+        )}
+
+
+        {error && (
+          <div className="attendance-error">
+
+            <XCircle
+              size={17}
+            />
+
+            <span>
+              {error}
+            </span>
+
+          </div>
+        )}
+
+      </div>
+
     </div>
   );
 }
